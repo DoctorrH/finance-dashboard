@@ -1,3 +1,4 @@
+/api/finfo/*   https://finfo-api.vndirect.com.vn/v4/:splat   200
 /api/dchart/*   https://dchart-api.vndirect.com.vn/dchart/:splat   200
 /api/giavang-now/*   https://giavang.now/:splat   200
 /api/sjc/*   https://sjc.com.vn/:splat   200

@@ -13,6 +13,15 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/dchart/, '/dchart')
       },
+      '/api/finfo': {
+        target: 'https://finfo-api.vndirect.com.vn',
+        changeOrigin: true,
+        headers: {
+          'Referer': 'https://dchart.vndirect.com.vn/',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        rewrite: (path) => path.replace(/^\/api\/finfo/, '/v4')
+      },
       '/api/giavang-now': {
         target: 'https://giavang.now',
         changeOrigin: true,

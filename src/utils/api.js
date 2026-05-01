@@ -80,6 +80,121 @@ function calculateRSI(data, period = 14) {
   return Number(rsi.toFixed(2));
 }
 
+function calculateMA(data, period = 50) {
+  if (data.length < period) return 0;
+  const subset = data.slice(-period);
+  const sum = subset.reduce((acc, curr) => acc + curr.close, 0);
+  return Number((sum / period).toFixed(2));
+}
+
+function calculateVolMA(data, period = 20) {
+  if (data.length < period) return 0;
+  const subset = data.slice(-period);
+  const sum = subset.reduce((acc, curr) => acc + curr.volume, 0);
+  return Number((sum / period).toFixed(0));
+}
+
+function calculateMFI(data, period = 14) {
+  if (data.length < period + 1) return 50;
+
+  const typicalPrices = data.map(d => (d.high + d.low + d.close) / 3);
+  const moneyFlows = typicalPrices.map((tp, i) => tp * data[i].volume);
+
+  let posFlow = 0;
+  let negFlow = 0;
+
+  for (let i = data.length - period; i < data.length; i++) {
+    if (typicalPrices[i] > typicalPrices[i - 1]) {
+      posFlow += moneyFlows[i];
+    } else if (typicalPrices[i] < typicalPrices[i - 1]) {
+      negFlow += moneyFlows[i];
+    }
+  }
+
+  if (negFlow === 0) return 100;
+  const mfr = posFlow / negFlow;
+  return Number((100 - (100 / (1 + mfr))).toFixed(2));
+}
+
+export function getRecommendation(tickerData, holding = null) {
+  const { rsi, mfi, volRatio, price, changePercent, ma50 } = tickerData;
+  const plPercent = holding ? ((price - holding.buyPrice) / holding.buyPrice) * 100 : 0;
+  
+  let action = 'HOLD';
+  let strength = 'Normal';
+  let reason = '';
+
+  // 1. Tín hiệu MUA MẠNH
+  if (rsi < 30 && mfi < 20 && volRatio > 1.2) {
+    action = 'BUY';
+    strength = 'Strong';
+    reason = `TÍN HIỆU CỰC MẠNH: RSI (${rsi}) và MFI (${mfi}) đều quá bán, kèm theo Volume đột biến (Vol Ratio: ${volRatio.toFixed(2)}). Dòng tiền lớn đang bắt đáy quyết liệt.`;
+    return { action, strength, reason };
+  }
+
+  // 2. Tín hiệu BÁN QUYẾT LIỆT / CẮT LỖ
+  if (holding) {
+    if (plPercent <= -7) {
+      if (rsi < 30) {
+        action = 'WATCH';
+        strength = 'Warning';
+        reason = `Vi phạm cắt lỗ (${plPercent.toFixed(2)}%) nhưng RSI đang quá bán cực độ (${rsi}). Khuyên bạn tạm giữ, chờ nhịp hồi kỹ thuật để bán được giá tốt hơn.`;
+      } else {
+        action = 'SELL';
+        strength = 'Strong';
+        reason = `BÁN QUYẾT LIỆT: Lỗ ${Math.abs(plPercent).toFixed(2)}%, vi phạm kỷ luật cắt lỗ (> 7%). Hãy thoát vị thế ngay để bảo vệ vốn.`;
+      }
+      return { action, strength, reason };
+    }
+  }
+
+  if (rsi > 70 && mfi > 80 && volRatio < 0.8) {
+    action = 'SELL';
+    strength = 'Strong';
+    reason = `CẢNH BÁO ĐẢO CHIỀU: RSI (${rsi}) và MFI (${mfi}) quá mua nhưng Volume đang đuối sức (Vol Ratio: ${volRatio.toFixed(2)}). Rủi ro sập mạnh rất cao.`;
+    return { action, strength, reason };
+  }
+
+  // 3. Cảnh báo Bull Trap
+  if (changePercent > 2 && volRatio < 0.7) {
+    action = 'WATCH';
+    strength = 'Warning';
+    reason = `CẢNH BÁO BULL TRAP: Giá tăng mạnh (${changePercent}%) nhưng khối lượng rất thấp (Vol Ratio: ${volRatio.toFixed(2)}). Nhịp tăng thiếu bền vững.`;
+    return { action, strength, reason };
+  }
+
+  // 4. Gồng lãi thông minh
+  if (holding && plPercent >= 10) {
+    if (mfi < 70 && rsi < 65) {
+      action = 'HOLD';
+      strength = 'Strong';
+      reason = `GỒNG LÃI THÔNG MINH: Lợi nhuận ${plPercent.toFixed(2)}% nhưng Dòng tiền (MFI: ${mfi}) và RSI (${rsi}) vẫn đang hướng lên. Tiếp tục nắm giữ để tối ưu lợi nhuận.`;
+    } else {
+      action = 'SELL';
+      strength = 'Normal';
+      reason = `Lợi nhuận tốt (${plPercent.toFixed(2)}%) và các chỉ số đã tiệm cận vùng quá mua. Nên xem xét chốt lời từng phần.`;
+    }
+    return { action, strength, reason };
+  }
+
+  // 5. Mặc định
+  if (rsi < 30 && price > ma50) {
+    action = 'BUY';
+    strength = 'Normal';
+    reason = `Bắt đáy trong xu hướng tăng: RSI quá bán (${rsi}) khi giá vẫn giữ được MA50. Cơ hội giải ngân an toàn.`;
+  } else if (rsi > 70) {
+    action = 'SELL';
+    strength = 'Normal';
+    reason = `RSI quá mua (${rsi}). Thị trường đang nóng, nên hạ tỷ trọng.`;
+  } else {
+    action = 'HOLD';
+    strength = 'Normal';
+    reason = `Thị trường đang tích lũy. RSI (${rsi}) và MFI (${mfi}) ổn định. Tiếp tục nắm giữ và quan sát.`;
+  }
+
+  return { action, strength, reason };
+}
+
 export async function fetchStockData() {
   const to = Math.floor(Date.now() / 1000);
   const from = to - (6 * 30 * 24 * 60 * 60); // 6 months ago
@@ -119,24 +234,16 @@ export async function fetchStockData() {
       const changePercent = prev.close !== 0 ? (change / prev.close) * 100 : 0;
       
       const rsi = calculateRSI(history);
+      const mfi = calculateMFI(history);
+      const ma50 = calculateMA(history, 50);
+      const volMA20 = calculateVolMA(history, 20);
+      const volRatio = volMA20 > 0 ? latest.volume / volMA20 : 1;
       
-      let prediction = 'HOLD';
-      let reason = `Chỉ số RSI hiện tại là ${rsi}, nằm ở vùng trung lập (30 - 70). Cổ phiếu đang trong giai đoạn tích lũy hoặc xu hướng chưa rõ ràng. Khuyến nghị GIỮ và quan sát thêm.`;
-
-      if (rsi < 30) {
-        prediction = 'BUY';
-        reason = `Chỉ số RSI là ${rsi} (< 30), cho thấy cổ phiếu đang rơi vào vùng QUÁ BÁN (Oversold). Áp lực bán có thể đã cạn kiệt và xác suất cao sẽ có nhịp hồi phục giá. Khuyến nghị MUA thăm dò.`;
-      }
-      else if (rsi > 70) {
-        prediction = 'SELL';
-        reason = `Chỉ số RSI là ${rsi} (> 70), cho thấy cổ phiếu đang rơi vào vùng QUÁ MUA (Overbought). Đà tăng có thể đã bị rướn quá mức và rủi ro điều chỉnh giảm giá là rất cao. Khuyến nghị BÁN chốt lời.`;
-      } else if (rsi < 40) {
-        prediction = 'BUY';
-        reason = `Chỉ số RSI là ${rsi} (tiệm cận vùng 30), cho thấy cổ phiếu đang chịu áp lực điều chỉnh nhưng lực bán đang yếu dần. Có thể cân nhắc giải ngân một phần (MUA) đón sóng hồi.`;
-      } else if (rsi > 60) {
-        prediction = 'SELL';
-        reason = `Chỉ số RSI là ${rsi} (tiệm cận vùng 70), cổ phiếu đang tăng khá nóng. Rủi ro điều chỉnh đang tăng dần, cân nhắc hạ tỷ trọng (BÁN) để bảo toàn lợi nhuận.`;
-      }
+      const analysis = getRecommendation({
+        rsi, mfi, volRatio, ma50,
+        price: latest.close,
+        changePercent: Number(changePercent.toFixed(2))
+      });
 
       return {
         ...ticker,
@@ -145,8 +252,13 @@ export async function fetchStockData() {
         changePercent: Number(changePercent.toFixed(2)),
         volume: latest.volume,
         rsi,
-        prediction,
-        reason,
+        mfi,
+        ma50,
+        volMA20,
+        volRatio,
+        prediction: analysis.action,
+        strength: analysis.strength,
+        reason: analysis.reason,
         history
       };
     } catch (error) {

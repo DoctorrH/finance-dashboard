@@ -258,8 +258,23 @@ body {
 
 .analysis-panel.hold-signal {
   border-left-color: var(--hold-color);
-  background-color: rgba(234, 179, 8, 0.05);
+  background-color: rgba(100, 116, 139, 0.05);
 }
+
+.analysis-panel.watch-signal {
+  border-left-color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.05);
+}
+
+.analysis-panel.strong { border-left-width: 8px; }
+.analysis-panel.warning { border-left-style: dashed; }
+
+.strength-badge {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 800;
+}
+
 
 .analysis-header {
   display: flex;

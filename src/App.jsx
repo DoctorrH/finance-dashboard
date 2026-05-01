@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { fetchStockData } from './utils/api';
+import { fetchStockData, getRecommendation } from './utils/api';
+import { engine } from './utils/analysisEngine';
 import TickerTable from './components/TickerTable';
 import CandlestickChart from './components/CandlestickChart';
 import PortfolioManager from './components/PortfolioManager';
@@ -7,7 +8,8 @@ import GoldDashboard from './components/GoldDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import OverviewDashboard from './components/OverviewDashboard';
 import LoginPage from './components/LoginPage';
-import { Activity, TrendingUp, TrendingDown, Clock, Loader2, Lightbulb, Briefcase, BarChart2, Wallet, PieChart, LogOut } from 'lucide-react';
+import StockScanner from './components/StockScanner';
+import { Activity, TrendingUp, TrendingDown, Clock, Loader2, Lightbulb, Briefcase, BarChart2, Wallet, PieChart, LogOut, Search } from 'lucide-react';
 import { savePortfolioToFirebase, subscribeToPortfolio, onAuthChange, signOutUser, migrateOldData } from './firebase';
 
 class ErrorBoundary extends React.Component {
@@ -79,6 +81,8 @@ function Dashboard({ user }) {
   
   const [activeTab, setActiveTab] = useState('market'); // 'market' or 'portfolio'
   const [portfolio, setPortfolio] = useState([]);
+  const [finalReport, setFinalReport] = useState(null);
+  const [isReportLoading, setIsReportLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToPortfolio(uid, (data) => {
@@ -86,6 +90,22 @@ function Dashboard({ user }) {
     });
     return () => unsubscribe();
   }, [uid]);
+
+  useEffect(() => {
+    async function getAdvancedReport() {
+      if (!selectedTicker) return;
+      try {
+        setIsReportLoading(true);
+        const report = await engine.generateFinalReport(selectedTicker, holding);
+        setFinalReport(report);
+      } catch (err) {
+        console.error("Failed to generate report:", err);
+      } finally {
+        setIsReportLoading(false);
+      }
+    }
+    getAdvancedReport();
+  }, [selectedTicker, portfolio]); // Re-run if selected ticker or portfolio (for holding info) changes
 
   useEffect(() => {
     async function loadData() {
@@ -175,45 +195,14 @@ function Dashboard({ user }) {
     return 'var(--hold-color)';
   };
 
-  // Personalized AI Logic
+  // --- Personalized AI Logic (Analysis Engine v3) ---
   const holding = selectedTicker ? portfolio.find(p => p.symbol === selectedTicker.symbol) : null;
-  let aiPrediction = selectedTicker ? selectedTicker.prediction : 'HOLD';
-  let aiReason = selectedTicker ? selectedTicker.reason : '';
+  
+  const aiPrediction = finalReport ? finalReport.verdict : 'HOLD';
+  const aiReason = finalReport ? finalReport.analysis.technical : '';
+  const aiStrength = finalReport ? (finalReport.rating.split('/')[0] > 75 ? 'Strong' : 'Normal') : 'Normal';
 
-  if (holding && selectedTicker) {
-    const currentPrice = selectedTicker.price;
-    const plPercent = ((currentPrice - holding.buyPrice) / holding.buyPrice) * 100;
-    const rsi = selectedTicker.rsi;
 
-    if (plPercent <= -7) {
-      if (rsi < 30) {
-        aiPrediction = 'HOLD';
-        aiReason = `Bạn đang lỗ ${Math.abs(plPercent).toFixed(2)}% nhưng RSI đang ở vùng QUÁ BÁN (${rsi}). Lực rơi sắp cạn, hạn chế bán tháo lúc này, NẮM GIỮ chờ nhịp hồi phục để cơ cấu.`;
-      } else {
-        aiPrediction = 'SELL';
-        aiReason = `Bạn đang lỗ ${Math.abs(plPercent).toFixed(2)}%, vi phạm nguyên tắc quản trị rủi ro (> 7%). RSI là ${rsi}. Khuyến nghị CẮT LỖ dứt khoát để bảo vệ vốn.`;
-      }
-    } else if (plPercent >= 10) {
-      if (rsi > 70) {
-        aiPrediction = 'SELL';
-        aiReason = `Tuyệt vời! Bạn đang lãi ${plPercent.toFixed(2)}% và cổ phiếu đã vào vùng QUÁ MUA (RSI = ${rsi}). Rủi ro đảo chiều rất cao, khuyến nghị CHỐT LỜI bảo toàn thành quả.`;
-      } else {
-        aiPrediction = 'HOLD';
-        aiReason = `Bạn đang có mức sinh lời tốt (${plPercent.toFixed(2)}%). RSI hiện tại (${rsi}) chưa có dấu hiệu nguy hiểm. Tiếp tục NẮM GIỮ và dời điểm chặn lãi lên cao hơn.`;
-      }
-    } else {
-      if (rsi > 70) {
-        aiPrediction = 'SELL';
-        aiReason = `Bạn đang nắm giữ mã này với hiệu suất ${plPercent.toFixed(2)}%. Tuy nhiên RSI đã báo động đỏ (${rsi}). Nên xem xét BÁN để tránh rủi ro điều chỉnh.`;
-      } else if (rsi < 30) {
-        aiPrediction = 'BUY';
-        aiReason = `Bạn đang nắm giữ mã này. RSI giảm sâu về ${rsi} (Quá bán). Nếu còn sức mua, có thể xem xét GIA TĂNG tỷ trọng đón sóng hồi.`;
-      } else {
-        aiPrediction = 'HOLD';
-        aiReason = `Cổ phiếu đang diễn biến bình thường, vị thế của bạn đang dao động ${plPercent >= 0 ? '+' : ''}${plPercent.toFixed(2)}%. Khuyến nghị tiếp tục NẮM GIỮ.`;
-      }
-    }
-  }
 
   return (
     <div className="app-container">
@@ -347,6 +336,12 @@ function Dashboard({ user }) {
                 <BarChart2 size={16} /> Thị Trường
               </button>
               <button 
+                className={`tab-btn ${activeTab === 'scanner' ? 'active' : ''}`}
+                onClick={() => setActiveTab('scanner')}
+              >
+                <Search size={16} /> Bộ Lọc AI
+              </button>
+              <button 
                 className={`tab-btn ${activeTab === 'portfolio' ? 'active' : ''}`}
                 onClick={() => setActiveTab('portfolio')}
               >
@@ -360,6 +355,18 @@ function Dashboard({ user }) {
                 selectedTicker={selectedTicker} 
                 onSelectTicker={setSelectedTicker} 
               />
+            ) : activeTab === 'scanner' ? (
+              <div style={{ padding: '0.5rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                  * Chọn mã trong bộ lọc để xem chi tiết biểu đồ
+                </div>
+                <div style={{ maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' }}>
+                  <StockScanner stockData={stockData} onSelectTicker={(s) => {
+                    setSelectedTicker(s);
+                    setActiveTab('market');
+                  }} />
+                </div>
+              </div>
             ) : (
               <PortfolioManager 
                 portfolio={portfolio}
@@ -397,6 +404,18 @@ function Dashboard({ user }) {
                         {selectedTicker.rsi}
                       </span>
                     </div>
+                    <div className="stat-item">
+                      <span className="stat-label">MFI (14)</span>
+                      <span className="stat-value" style={{color: selectedTicker.mfi > 80 ? 'var(--accent-red)' : selectedTicker.mfi < 20 ? 'var(--accent-green)' : 'var(--text-primary)'}}>
+                        {selectedTicker.mfi}
+                      </span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Vol Ratio</span>
+                      <span className="stat-value" style={{color: selectedTicker.volRatio > 1.2 ? 'var(--accent-green)' : 'var(--text-primary)'}}>
+                        {selectedTicker.volRatio.toFixed(2)}x
+                      </span>
+                    </div>
                   </div>
                 </div>
                 
@@ -404,13 +423,41 @@ function Dashboard({ user }) {
                   <CandlestickChart data={selectedTicker.history} />
                 </ErrorBoundary>
                 
-                <div className={`analysis-panel ${aiPrediction.toLowerCase()}-signal`}>
-                  <div className="analysis-header" style={{color: getSignalColor(aiPrediction)}}>
-                    <Lightbulb size={18} />
-                    Gợi Ý Của AI: Khuyến Nghị {aiPrediction === 'BUY' ? 'MUA' : aiPrediction === 'SELL' ? 'BÁN' : 'GIỮ'}
+                <div className={`analysis-panel ${aiPrediction.toLowerCase()}-signal ${aiStrength.toLowerCase()}`}>
+                  <div className="analysis-header" style={{color: getSignalColor(aiPrediction), display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                      <Lightbulb size={18} />
+                      AI Robo-Advisor: {aiPrediction} ({finalReport?.rating || '0/100'})
+                    </div>
+                    {isReportLoading && <Loader2 size={14} className="animate-spin" />}
                   </div>
-                  <div className="analysis-content">
-                    {aiReason}
+
+                  {finalReport && (
+                    <div className="analysis-grid" style={{ 
+                      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                      gap: '1rem', marginTop: '1rem', fontSize: '0.85rem' 
+                    }}>
+                      <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                        <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Chất lượng (Cơ bản)</div>
+                        <div style={{ fontWeight: 600 }}>{finalReport.analysis.fundamental}</div>
+                      </div>
+                      <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                        <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Dòng tiền ngoại</div>
+                        <div style={{ fontWeight: 600 }}>{finalReport.analysis.big_money}</div>
+                      </div>
+                      <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                        <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Bối cảnh thị trường</div>
+                        <div style={{ fontWeight: 600, color: finalReport.isBear ? 'var(--accent-red)' : 'var(--accent-green)' }}>{finalReport.analysis.market}</div>
+                      </div>
+                      <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                        <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Quản trị rủi ro</div>
+                        <div style={{ fontWeight: 600, color: 'var(--accent-red)' }}>SL: {finalReport.risk_management.stop_loss}</div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="analysis-content" style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                    <strong>Nhận định kỹ thuật:</strong> {finalReport?.analysis.technical}
                   </div>
                 </div>
               </>
