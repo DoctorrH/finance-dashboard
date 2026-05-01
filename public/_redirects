@@ -1,0 +1,6 @@
+/api/dchart/*   https://dchart-api.vndirect.com.vn/dchart/:splat   200
+/api/giavang-now/*   https://giavang.now/:splat   200
+/api/sjc/*   https://sjc.com.vn/:splat   200
+/api/tygia/*   https://tygia.com/:splat   200
+/api/yahoo/*   https://query1.finance.yahoo.com/:splat   200
+/*   /index.html   200
