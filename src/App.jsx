@@ -79,10 +79,43 @@ function Dashboard({ user }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  const [activeTab, setActiveTab] = useState('market'); // 'market' or 'portfolio'
+  const [activeTab, setActiveTab] = useState('market'); // 'market', 'portfolio', 'scanner'
   const [portfolio, setPortfolio] = useState([]);
   const [finalReport, setFinalReport] = useState(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
+
+  // Global Scanner State
+  const [scanResults, setScanResults] = useState([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
+
+  const startGlobalScan = async () => {
+    if (isScanning || !stockData.length) return;
+    setIsScanning(true);
+    setScanProgress(0);
+    const scanned = [];
+    
+    for (let i = 0; i < stockData.length; i++) {
+      const ticker = stockData[i];
+      try {
+        const report = await engine.generateFinalReport(ticker);
+        scanned.push({
+          ...ticker,
+          score: parseInt(report.rating.split('/')[0]) || 0,
+          verdict: report.verdict,
+          marketStatus: report.analysis?.market || 'N/A'
+        });
+      } catch (err) {
+        console.error(`Failed to scan ${ticker.symbol}`, err);
+        scanned.push({ ...ticker, score: 0, verdict: 'LỖI', marketStatus: 'N/A' });
+      }
+      setScanProgress(Math.round(((i + 1) / stockData.length) * 100));
+      await new Promise(resolve => setTimeout(resolve, 150)); // Throttling
+    }
+
+    setScanResults([...scanned].sort((a, b) => b.score - a.score));
+    setIsScanning(false);
+  };
 
   useEffect(() => {
     const unsubscribe = subscribeToPortfolio(uid, (data) => {
@@ -105,7 +138,7 @@ function Dashboard({ user }) {
       }
     }
     getAdvancedReport();
-  }, [selectedTicker, portfolio]); // Re-run if selected ticker or portfolio (for holding info) changes
+  }, [selectedTicker, portfolio]);
 
   useEffect(() => {
     async function loadData() {
@@ -212,6 +245,18 @@ function Dashboard({ user }) {
           <Activity color={currentApp === 'stocks' ? "#10b981" : currentApp === 'gold' ? "#f59e0b" : currentApp === 'overview' ? "#8b5cf6" : "#3b82f6"} size={28} />
           <h1>Finance Dashboard</h1>
         </div>
+
+        {isScanning && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', background: 'rgba(16, 185, 129, 0.1)', padding: '0.4rem 1rem', borderRadius: '2rem', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+            <Loader2 className="animate-spin" size={16} color="var(--accent-green)" />
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-green)' }}>
+              Đang quét thị trường: {scanProgress}%
+            </div>
+            <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ width: `${scanProgress}%`, height: '100%', background: 'var(--accent-green)', transition: 'width 0.3s' }}></div>
+            </div>
+          </div>
+        )}
         
         {/* App Switcher */}
         <div className="app-switcher" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -358,13 +403,20 @@ function Dashboard({ user }) {
             ) : activeTab === 'scanner' ? (
               <div style={{ padding: '0.5rem' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                  * Chọn mã trong bộ lọc để xem chi tiết biểu đồ
+                  * Kết quả quét được duy trì ngầm khi bạn chuyển tab
                 </div>
                 <div style={{ maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' }}>
-                  <StockScanner stockData={stockData} onSelectTicker={(s) => {
-                    setSelectedTicker(s);
-                    setActiveTab('market');
-                  }} />
+                  <StockScanner 
+                    stockData={stockData} 
+                    results={scanResults}
+                    isScanning={isScanning}
+                    progress={scanProgress}
+                    onStartScan={startGlobalScan}
+                    onSelectTicker={(s) => {
+                      setSelectedTicker(s);
+                      setActiveTab('market');
+                    }} 
+                  />
                 </div>
               </div>
             ) : (

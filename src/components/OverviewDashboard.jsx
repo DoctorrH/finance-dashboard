@@ -10,7 +10,6 @@ import {
 } from '../firebase';
 import { fetchDomesticGold } from '../utils/goldApi';
 import { Wallet, TrendingUp, CreditCard, PiggyBank, Target, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
-import { createChart } from 'lightweight-charts';
 
 function formatVND(num) {
   if (!num) return '0 ₫';
@@ -140,56 +139,11 @@ export default function OverviewDashboard({ stockData, uid }) {
     return [...assetHistory].sort((a, b) => a.time.localeCompare(b.time));
   }, [assetHistory]);
 
-  const assetChartContainerRef = React.useRef(null);
-  const assetChartRef = React.useRef(null);
-
-  useEffect(() => {
-    if (!assetChartContainerRef.current) return;
-    if (assetChartData.length < 2) return; // Lightweight charts needs at least 2 points for an area chart
-    
-    try {
-      if (!assetChartRef.current) {
-        const chart = createChart(assetChartContainerRef.current, {
-          layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#9ca3af' },
-          grid: { vertLines: { color: 'rgba(255, 255, 255, 0.05)' }, horzLines: { color: 'rgba(255, 255, 255, 0.05)' } },
-          rightPriceScale: { borderVisible: false },
-          timeScale: { borderVisible: false, fixLeftEdge: true, fixRightEdge: true },
-          height: 250,
-        });
-        
-        const areaSeries = chart.addAreaSeries({
-          lineColor: '#3b82f6',
-          topColor: 'rgba(59, 130, 246, 0.4)',
-          bottomColor: 'rgba(59, 130, 246, 0.0)',
-          lineWidth: 3,
-        });
-        
-        assetChartRef.current = { chart, areaSeries };
-      }
-      
-      assetChartRef.current.areaSeries.setData(assetChartData);
-      assetChartRef.current.chart.timeScale().fitContent();
-      
-      const handleResize = () => {
-        if (assetChartContainerRef.current && assetChartRef.current) {
-          assetChartRef.current.chart.applyOptions({ width: assetChartContainerRef.current.clientWidth });
-        }
-      };
-      window.addEventListener('resize', handleResize);
-      
-      return () => {
-        window.removeEventListener('resize', handleResize);
-      };
-    } catch (err) {
-      console.error("Error drawing chart:", err);
-    }
-  }, [assetChartData]);
-
   return (
     <div className="finance-dashboard" style={{ padding: '1rem', overflowY: 'auto' }}>
       
-      {/* 4 Summary Cards */}
-      <div className="finance-summary-row four-cols">
+      {/* Row 1: Core Summary Cards (3 cards) */}
+      <div className="finance-summary-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
         {/* Total Assets */}
         <div className="finance-card balance-card">
           <Wallet size={24} style={{ marginBottom: '0.5rem', color: '#3b82f6' }} />
@@ -210,57 +164,94 @@ export default function OverviewDashboard({ stockData, uid }) {
           <div className="finance-card-label">Tổng Tiết Kiệm</div>
           <div className="finance-card-value">{formatVND(totalSavings)}</div>
         </div>
+      </div>
 
-        {/* Current Month Net */}
-        <div className="finance-card" style={{ background: 'var(--card-bg)', borderLeft: '4px solid #f59e0b' }}>
-          <Activity size={24} style={{ marginBottom: '0.5rem', color: '#f59e0b' }} />
-          <div className="finance-card-label">Thu/Chi Tháng Này</div>
-          <div className="finance-card-value" style={{ color: netMonthly >= 0 ? '#10b981' : '#ef4444' }}>
-            {netMonthly >= 0 ? '+' : ''}{formatVND(netMonthly)}
+      {/* Row 2: Asset Distribution (Pie Chart) */}
+      <div className="finance-card" style={{ marginTop: '1.5rem' }}>
+        <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Target size={18} color="#3b82f6" /> Phân Bổ Tài Sản
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3rem', flexWrap: 'wrap', padding: '1rem' }}>
+          {/* SVG Donut Chart */}
+          <div style={{ position: 'relative', width: '180px', height: '180px' }}>
+            <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+              {(() => {
+                const total = totalAssets || 1;
+                const pStock = (totalStockValue / total) * 100;
+                const pGold = (totalGoldValue / total) * 100;
+                const pSavings = (totalSavings / total) * 100;
+                const r = 40;
+                const circ = 2 * Math.PI * r;
+                return (
+                  <>
+                    <circle cx="50" cy="50" r={r} fill="transparent" stroke="#10b981" strokeWidth="12" strokeDasharray={`${circ} ${circ}`} strokeDashoffset="0" />
+                    <circle cx="50" cy="50" r={r} fill="transparent" stroke="#f59e0b" strokeWidth="12" strokeDasharray={`${(pGold + pStock) / 100 * circ} ${circ}`} strokeDashoffset="0" />
+                    <circle cx="50" cy="50" r={r} fill="transparent" stroke="#3b82f6" strokeWidth="12" strokeDasharray={`${pStock / 100 * circ} ${circ}`} strokeDashoffset="0" />
+                    <circle cx="50" cy="50" r={r} fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="12" strokeDasharray={totalAssets === 0 ? `${circ} ${circ}` : `0 ${circ}`} />
+                    <circle cx="50" cy="50" r="32" fill="var(--card-bg)" />
+                  </>
+                );
+              })()}
+            </svg>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Phân bổ</div>
+              <div style={{ fontSize: '1rem', fontWeight: 800 }}>Core AI</div>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem', marginTop: '0.25rem', color: 'var(--text-secondary)' }}>
-            <span style={{ display: 'flex', alignItems: 'center' }}><ArrowUpRight size={12} color="#10b981" /> {formatVND(currentIncome)}</span>
-            <span style={{ display: 'flex', alignItems: 'center' }}><ArrowDownRight size={12} color="#ef4444" /> {formatVND(currentExpense)}</span>
+
+          <div className="asset-breakdown" style={{ flex: 1, maxWidth: '400px' }}>
+            <div className="asset-item" style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
+              <div className="asset-info">
+                <span className="asset-color" style={{ background: '#3b82f6' }}></span>
+                <span style={{ fontWeight: 600 }}>Chứng Khoán</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 800 }}>{formatVND(totalStockValue)}</div>
+                <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>{totalAssets > 0 ? ((totalStockValue/totalAssets)*100).toFixed(1) : 0}%</div>
+              </div>
+            </div>
+            <div className="asset-item" style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
+              <div className="asset-info">
+                <span className="asset-color" style={{ background: '#f59e0b' }}></span>
+                <span style={{ fontWeight: 600 }}>Vàng</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 800 }}>{formatVND(totalGoldValue)}</div>
+                <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>{totalAssets > 0 ? ((totalGoldValue/totalAssets)*100).toFixed(1) : 0}%</div>
+              </div>
+            </div>
+            <div className="asset-item" style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
+              <div className="asset-info">
+                <span className="asset-color" style={{ background: '#10b981' }}></span>
+                <span style={{ fontWeight: 600 }}>Tiết Kiệm</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 800 }}>{formatVND(totalSavings)}</div>
+                <div style={{ fontSize: '0.75rem', color: '#10b981' }}>{totalAssets > 0 ? ((totalSavings/totalAssets)*100).toFixed(1) : 0}%</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-        
-        {/* Left Col: Asset Breakdown */}
+        {/* Row 3 Left: Monthly Summary */}
         <div className="finance-card" style={{ flex: 1, minWidth: '300px' }}>
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Target size={18} color="#3b82f6" /> Phân Bổ Tài Sản
+            <Activity size={18} color="#f59e0b" /> Thu/Chi Tháng Này
           </h3>
-          
-          <div className="asset-breakdown">
-            <div className="asset-item">
-              <div className="asset-info">
-                <span className="asset-color" style={{ background: '#3b82f6' }}></span>
-                <span>Chứng Khoán</span>
-              </div>
-              <span>{formatVND(totalStockValue)}</span>
-            </div>
-            <div className="asset-item">
-              <div className="asset-info">
-                <span className="asset-color" style={{ background: '#f59e0b' }}></span>
-                <span>Vàng</span>
-              </div>
-              <span>{formatVND(totalGoldValue)}</span>
-            </div>
-            <div className="asset-item">
-              <div className="asset-info">
-                <span className="asset-color" style={{ background: '#10b981' }}></span>
-                <span>Tiết Kiệm</span>
-              </div>
-              <span>{formatVND(totalSavings)}</span>
-            </div>
+          <div className="finance-card-value" style={{ color: netMonthly >= 0 ? '#10b981' : '#ef4444', fontSize: '1.5rem', marginBottom: '1rem' }}>
+            {netMonthly >= 0 ? '+' : ''}{formatVND(netMonthly)}
           </div>
-          
-          <div className="asset-progress-bar" style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden', marginTop: '1rem' }}>
-            <div style={{ width: `${totalAssets > 0 ? (totalStockValue / totalAssets) * 100 : 33.33}%`, background: '#3b82f6' }}></div>
-            <div style={{ width: `${totalAssets > 0 ? (totalGoldValue / totalAssets) * 100 : 33.33}%`, background: '#f59e0b' }}></div>
-            <div style={{ width: `${totalAssets > 0 ? (totalSavings / totalAssets) * 100 : 33.34}%`, background: '#10b981' }}></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>THU NHẬP</div>
+              <div style={{ fontWeight: 700, color: '#10b981' }}>{formatVND(currentIncome)}</div>
+            </div>
+            <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>CHI TIÊU</div>
+              <div style={{ fontWeight: 700, color: '#ef4444' }}>{formatVND(currentExpense)}</div>
+            </div>
           </div>
         </div>
 
@@ -294,17 +285,51 @@ export default function OverviewDashboard({ stockData, uid }) {
 
       </div>
 
-      {/* Asset Growth Chart */}
+      {/* Asset Growth Chart (Bar Chart) */}
       <div className="finance-card" style={{ marginTop: '1.5rem' }}>
         <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <TrendingUp size={18} color="#3b82f6" /> Tăng Trưởng Tài Sản (12 Tháng)
         </h3>
+        
         {assetChartData.length < 2 ? (
           <div style={{ width: '100%', height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}>
             Hệ thống đang thu thập dữ liệu (cần ít nhất 2 tháng để vẽ biểu đồ)
           </div>
         ) : (
-          <div ref={assetChartContainerRef} style={{ width: '100%', height: '250px' }}></div>
+          <div style={{ padding: '1rem 0' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', height: '200px', gap: '0.5rem', position: 'relative', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              {(() => {
+                const maxVal = Math.max(...assetChartData.map(h => h.value), 1);
+                // Lấy 12 bản ghi gần nhất
+                const recentData = assetChartData.slice(-12);
+                
+                return recentData.map((h, i) => {
+                  const height = Math.max((h.value / maxVal) * 100, 2);
+                  const date = new Date(h.time);
+                  const label = `${date.getMonth() + 1}/${date.getFullYear().toString().slice(2)}`;
+                  
+                  return (
+                    <div key={h.time} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', height: '100%' }}>
+                      <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                        <div 
+                          style={{ 
+                            height: `${height}%`, 
+                            width: '80%', 
+                            maxWidth: '40px',
+                            background: 'linear-gradient(to top, #2563eb, #3b82f6)', 
+                            borderRadius: '4px 4px 0 0',
+                            transition: 'height 0.5s ease-out'
+                          }}
+                          title={`${label}: ${formatVND(h.value)}`}
+                        ></div>
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{label}</div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
         )}
       </div>
     </div>

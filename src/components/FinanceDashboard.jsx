@@ -23,6 +23,46 @@ function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+/**
+ * Tính toán lịch trả nợ thông minh (Dư nợ giảm dần)
+ */
+function calculateLoanSchedule(principal, ratePerYear, months, principalFrequency = 1, additionalLoans = []) {
+  const schedule = [];
+  let remainingPrincipal = principal;
+  const monthlyRate = ratePerYear / 100 / 12;
+  
+  // Sắp xếp các khoản vay bổ sung theo tháng
+  const additions = [...additionalLoans].sort((a, b) => a.month - b.month);
+  
+  for (let m = 1; m <= months; m++) {
+    // Kiểm tra vay bổ sung trong tháng này
+    const currentAdditions = additions.filter(a => a.month === m);
+    currentAdditions.forEach(a => {
+      remainingPrincipal += a.amount;
+    });
+
+    const interestPayment = remainingPrincipal * monthlyRate;
+    let principalPayment = 0;
+    
+    // Trả gốc định kỳ (ví dụ mỗi 6 tháng)
+    if (m % principalFrequency === 0) {
+      principalPayment = Math.min(principal / (months / principalFrequency), remainingPrincipal);
+    }
+
+    schedule.push({
+      month: m,
+      interest: interestPayment,
+      principal: principalPayment,
+      total: interestPayment + principalPayment,
+      remaining: Math.max(remainingPrincipal - principalPayment, 0)
+    });
+
+    remainingPrincipal -= principalPayment;
+    if (remainingPrincipal <= 0 && m >= months) break;
+  }
+  return schedule;
+}
+
 // ==================== TAB 1: TRANSACTIONS ====================
 function TransactionsTab({ transactions, setTransactions, uid }) {
   const [showForm, setShowForm] = useState(false);
@@ -171,20 +211,23 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
 
 // ==================== TAB 2: DEBTS ====================
 function DebtsTab({ debts, setDebts, uid }) {
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [actionId, setActionId] = useState(null);
-  const [actionType, setActionType] = useState(null); // 'pay' or 'borrow'
-  const [payPrincipal, setPayPrincipal] = useState('');
-  const [payTotal, setPayTotal] = useState('');
   const DEFAULT_FORM = { 
     name: '', principalAmount: '', totalPayable: '', 
-    principalPaid: '0', totalPaid: '0',
-    interestRate: '', 
+    principalPaid: '0', totalPaid: '0', interestRate: '0', 
     startDate: new Date().toISOString().slice(0, 10), dueDate: '', 
-    repaymentSchedule: 'Hàng tháng' 
+    repaymentSchedule: 'Hàng tháng',
+    isSmart: true, // Mặc định dùng chế độ thông minh
+    principalFreq: '1' // Mặc định trả gốc mỗi tháng
   };
+
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(DEFAULT_FORM);
+  const [actionId, setActionId] = useState(null);
+  const [actionType, setActionType] = useState('pay'); // 'pay' or 'borrow'
+  const [payPrincipal, setPayPrincipal] = useState('');
+  const [payTotal, setPayTotal] = useState('');
+  const [showScheduleId, setShowScheduleId] = useState(null);
 
   // Auto-calculate totalPayable when principal, rate, dates change
   const autoCalcTotal = (principal, rate, start, due) => {
@@ -241,7 +284,7 @@ function DebtsTab({ debts, setDebts, uid }) {
     setForm(DEFAULT_FORM);
   };
 
-  const handlePay = (id) => {
+  const handlePayment = (id) => {
     const pPrincipal = parseFloat(payPrincipal) || 0;
     const pTotal = parseFloat(payTotal) || 0;
     if (pPrincipal <= 0 && pTotal <= 0) return;
@@ -262,23 +305,27 @@ function DebtsTab({ debts, setDebts, uid }) {
   };
 
   const handleBorrow = (id) => {
-    const pPrincipal = parseFloat(payPrincipal) || 0;
-    const pTotal = parseFloat(payTotal) || 0;
-    if (pPrincipal <= 0 && pTotal <= 0) return;
+    const amount = parseFloat(payPrincipal) || 0;
+    if (amount <= 0) return;
 
     const updated = debts.map(d => {
       if (d.id !== id) return d;
+      const additions = d.additions || [];
+      // Giả định vay thêm vào thời điểm hiện tại (tính tháng tương đối)
+      const start = new Date(d.startDate);
+      const now = new Date();
+      const monthDiff = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+      
       return { 
         ...d, 
-        principalAmount: d.principalAmount + pPrincipal,
-        totalPayable: d.totalPayable + pTotal
+        principalAmount: d.principalAmount + amount,
+        additions: [...additions, { amount, month: Math.max(1, monthDiff), date: now.toISOString().slice(0, 10) }]
       };
     });
     setDebts(updated);
     saveDebts(uid, updated);
     setActionId(null);
     setPayPrincipal('');
-    setPayTotal('');
   };
 
   const handleDelete = (id) => {
@@ -376,12 +423,12 @@ function DebtsTab({ debts, setDebts, uid }) {
           </select>
           <div className="finance-form-row">
             <div style={{ flex: 1 }}>
-              <label className="form-label">Gốc đã trả (VNĐ)</label>
-              <input type="number" className="input-field" value={form.principalPaid} onChange={e => handleFormChange('principalPaid', e.target.value)} />
+              <label className="form-label">Tần suất trả gốc (tháng/lần)</label>
+              <input type="number" className="input-field" placeholder="VD: 6 (Trả mỗi 6 tháng)" value={form.principalFreq} onChange={e => handleFormChange('principalFreq', e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <label className="form-label">Tổng đã trả (VNĐ)</label>
-              <input type="number" className="input-field" value={form.totalPaid} onChange={e => handleFormChange('totalPaid', e.target.value)} />
+              <label className="form-label">Thời gian vay (tháng)</label>
+              <input type="number" className="input-field" placeholder="VD: 24" value={form.durationMonths || '12'} onChange={e => handleFormChange('durationMonths', e.target.value)} />
             </div>
           </div>
           <div className="finance-form-actions">
@@ -462,35 +509,61 @@ function DebtsTab({ debts, setDebts, uid }) {
               {/* Action buttons */}
               {!isCompleted && (
                 <div className="debt-actions">
-                  <button className="debt-action-btn pay" onClick={() => { setActionId(d.id); setActionType('pay'); setPayPrincipal(''); setPayTotal(''); }}>
-                    <ArrowDownCircle size={14} /> Thanh toán
-                  </button>
-                  <button className="debt-action-btn borrow" onClick={() => { setActionId(d.id); setActionType('borrow'); setPayPrincipal(''); setPayTotal(''); }}>
-                    <ArrowUpCircle size={14} /> Nợ thêm
-                  </button>
+                  <button className="debt-action-btn" onClick={() => { setActionId(d.id); setActionType('pay'); }}>💰 Trả nợ</button>
+                  <button className="debt-action-btn" onClick={() => { setActionId(d.id); setActionType('borrow'); }}>➕ Vay thêm</button>
+                  <button className="debt-action-btn" onClick={() => setShowScheduleId(showScheduleId === d.id ? null : d.id)}>📅 Lịch trả</button>
                 </div>
               )}
 
               {actionId === d.id && (
-                <div className="debt-action-form-split">
-                  <div className="debt-action-title">
-                    {actionType === 'pay' ? '💳 Thanh toán' : '📈 Nợ thêm'}
+                <div className="debt-action-form">
+                  <input 
+                    type="number" 
+                    className="input-field" 
+                    placeholder={actionType === 'pay' ? "Số tiền trả gốc (VNĐ)" : "Số tiền vay thêm (VNĐ)"}
+                    value={payPrincipal} 
+                    onChange={e => setPayPrincipal(e.target.value)} 
+                  />
+                  <div className="finance-form-actions">
+                    <button className="btn-submit" onClick={() => actionType === 'pay' ? handlePayment(d.id) : handleBorrow(d.id)}>Xác nhận</button>
+                    <button className="btn-cancel" onClick={() => setActionId(null)}>Hủy</button>
                   </div>
-                  <div className="finance-form-row">
-                    <div style={{ flex: 1 }}>
-                      <label className="form-label">{actionType === 'pay' ? 'Trả gốc' : 'Gốc thêm'}</label>
-                      <input type="number" className="input-field" placeholder="VNĐ" value={payPrincipal} onChange={e => setPayPrincipal(e.target.value)} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label className="form-label">{actionType === 'pay' ? 'Trả tổng (gốc+lãi)' : 'Tổng thêm (gốc+lãi)'}</label>
-                      <input type="number" className="input-field" placeholder="VNĐ" value={payTotal} onChange={e => setPayTotal(e.target.value)} />
-                    </div>
+                </div>
+              )}
+
+              {showScheduleId === d.id && (
+                <div className="repayment-schedule-box" style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Lịch trả nợ dự kiến (Dư nợ giảm dần)</span>
+                    <span style={{ color: 'var(--accent-green)' }}>{d.interestRate}%/năm</span>
                   </div>
-                  <div className="finance-form-actions" style={{ marginTop: '0.5rem' }}>
-                    <button className="btn-submit small" onClick={() => actionType === 'pay' ? handlePay(d.id) : handleBorrow(d.id)}>
-                      <Check size={14} /> Xác nhận
-                    </button>
-                    <button className="btn-cancel small" onClick={() => setActionId(null)}><X size={14} /> Hủy</button>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', fontSize: '0.75rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: '#1a1d21' }}>
+                        <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                          <th style={{ padding: '0.4rem' }}>Kỳ</th>
+                          <th>Gốc</th>
+                          <th>Lãi</th>
+                          <th>Còn lại</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {calculateLoanSchedule(
+                          d.principalAmount, 
+                          d.interestRate, 
+                          parseInt(d.durationMonths || 12), 
+                          parseInt(d.principalFreq || 1),
+                          d.additions || []
+                        ).map(s => (
+                          <tr key={s.month} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                            <td style={{ padding: '0.4rem' }}>T.{s.month}</td>
+                            <td style={{ color: s.principal > 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{s.principal > 0 ? formatVND(s.principal) : '-'}</td>
+                            <td style={{ color: 'var(--accent-red)' }}>{formatVND(s.interest)}</td>
+                            <td>{formatVND(s.remaining)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
