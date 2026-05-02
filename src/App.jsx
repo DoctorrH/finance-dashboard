@@ -223,17 +223,23 @@ function Dashboard({ user }) {
   }
 
   const getSignalColor = (signal) => {
-    if (signal === 'BUY' || signal === 'MUA' || signal === 'MUA MẠNH') return 'var(--buy-color)';
-    if (signal === 'SELL' || signal === 'BÁN' || signal === 'BÁN / CẨN TRỌNG') return 'var(--sell-color)';
+    if (!signal) return 'var(--hold-color)';
+    const s = signal.toUpperCase();
+    if (s.includes('MUA') || s.includes('BUY')) return 'var(--buy-color)';
+    if (s.includes('BÁN') || s.includes('SELL')) return 'var(--sell-color)';
     return 'var(--hold-color)';
   };
 
   // --- Personalized AI Logic (Analysis Engine v3) ---
   const holding = selectedTicker ? portfolio.find(p => p.symbol === selectedTicker.symbol) : null;
   
-  const aiPrediction = finalReport ? finalReport.verdict : 'HOLD';
-  const aiReason = finalReport ? finalReport.analysis.technical : '';
-  const aiStrength = finalReport ? (finalReport.rating.split('/')[0] > 75 ? 'Strong' : 'Normal') : 'Normal';
+  const aiPrediction = finalReport?.verdict || 'HOLD';
+  const aiReason = finalReport?.analysis?.technical || '';
+  const aiScore = finalReport?.rating ? parseInt(finalReport.rating.split('/')[0]) : 0;
+  const aiStrength = aiScore > 75 ? 'Strong' : 'Normal';
+  
+  // Sanitize class name for CSS (Remove spaces and special chars)
+  const sanitizedPredictionClass = aiPrediction.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
 
 
@@ -475,7 +481,7 @@ function Dashboard({ user }) {
                   <CandlestickChart data={selectedTicker.history} />
                 </ErrorBoundary>
                 
-                <div className={`analysis-panel ${aiPrediction.toLowerCase()}-signal ${aiStrength.toLowerCase()}`}>
+                <div className={`analysis-panel ${sanitizedPredictionClass}-signal ${aiStrength.toLowerCase()}`}>
                   <div className="analysis-header" style={{color: getSignalColor(aiPrediction), display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
                       <Lightbulb size={18} />
