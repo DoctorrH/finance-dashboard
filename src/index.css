@@ -136,6 +136,104 @@ body {
   overflow-y: auto;
 }
 
+/* Responsive & PWA Optimizations */
+@media (max-width: 1024px) {
+  .app-container {
+    padding: 0.5rem;
+  }
+  
+  .finance-summary-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    max-height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    height: auto;
+  }
+
+  .header h1 {
+    font-size: 1.2rem;
+  }
+
+  .app-switcher {
+    width: 100%;
+    justify-content: space-around;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .switch-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .finance-summary-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .finance-toolbar {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .finance-filter {
+    justify-content: space-between;
+  }
+
+  .finance-card-value {
+    font-size: 1.2rem;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .chart-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .savings-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Touch improvements */
+  button, select, input {
+    min-height: 44px; /* Apple Human Interface Guidelines */
+  }
+
+  .btn-add, .btn-submit, .btn-cancel {
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Fix for PWA standalone mode */
+@media (display-mode: standalone) {
+  .header {
+    padding-top: env(safe-area-inset-top);
+  }
+  .app-container {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 .table-container::-webkit-scrollbar {
   width: 6px;
 }
