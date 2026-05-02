@@ -10,7 +10,19 @@
 
 [[redirects]]
   from = "/api/dchart/*"
-  to = "https://dchart-api.vndirect.com.vn/:splat"
+  to = "https://dchart-api.vndirect.com.vn/dchart/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/giavang-now/*"
+  to = "https://giavang.now/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/yahoo/*"
+  to = "https://query2.finance.yahoo.com/:splat"
   status = 200
   force = true
 

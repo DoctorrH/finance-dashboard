@@ -45,6 +45,9 @@ export default function GoldDashboard({ uid }) {
     }
     
     loadData();
+
+    const timer = setInterval(loadData, 30000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -256,12 +259,16 @@ export default function GoldDashboard({ uid }) {
                         <div className="item-vol">{new Date(h.buyDate).toLocaleDateString('vi-VN')}</div>
                       </div>
                       <div className="item-price">
-                        <span>{formatVND(currentPrice)}</span>
-                        <span className="item-cost">Mua: {formatVND(h.buyPrice)}</span>
+                        <div style={{fontSize: '0.85rem', fontWeight: 600}}>{formatVND(currentPrice)}</div>
+                        <div style={{fontSize: '0.7rem', color: 'var(--text-secondary)'}}>Vốn: {formatVND(h.buyPrice)} / {h.unit}</div>
                       </div>
-                      <div className="item-pl" style={{ color: pl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                        {pl >= 0 ? '+' : ''}{formatVND(pl)}
-                        <div style={{ fontSize: '0.75rem' }}>({plPct >= 0 ? '+' : ''}{plPct.toFixed(2)}%)</div>
+                      <div className="item-pl" style={{ textAlign: 'right' }}>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.9rem' }}>
+                          {formatVND(current)}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: pl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                          {pl >= 0 ? '+' : ''}{formatVND(pl)} ({plPct >= 0 ? '+' : ''}{plPct.toFixed(2)}%)
+                        </div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                         <button className="btn-edit" onClick={() => handleEdit(h)}><Edit3 size={14} /></button>
