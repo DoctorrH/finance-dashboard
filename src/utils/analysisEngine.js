@@ -130,43 +130,60 @@ export class AnalysisEngine {
 
     // 1. Tính điểm kỹ thuật cơ bản (0-70)
     let techScore = 0;
-    if (tickerData.rsi < 30) techScore += 30;
-    else if (tickerData.rsi < 40) techScore += 15;
+    if (tickerData.rsi < 30) techScore += 25; // Giảm nhẹ trọng số RSI để chia cho MA
+    else if (tickerData.rsi < 40) techScore += 10;
     
-    if (tickerData.mfi < 20) techScore += 20;
-    if (tickerData.volRatio > 1.2) techScore += 20;
-    if (tickerData.price > tickerData.ma50) techScore += 10;
+    if (tickerData.mfi < 20) techScore += 15;
+    if (tickerData.volRatio > 1.2) techScore += 15;
+    
+    // Hệ thống Trend (Xu hướng)
+    if (tickerData.price > tickerData.ma20) techScore += 10; // Xu hướng ngắn hạn (MA20)
+    if (tickerData.price > tickerData.ma50) techScore += 5;  // Xu hướng trung hạn (MA50)
 
     // 2. Điều chỉnh theo dòng tiền và thị trường (Tổng tối đa 100)
     let finalScore = techScore + foreign.scoreBonus;
-    if (fundamental.isGood) finalScore += 10;
-    if (!market.isBear) finalScore += 10;
+    if (fundamental.isGood) finalScore += 15; // Tăng trọng số cơ bản
+    if (!market.isBear) finalScore += 15;     // Tăng trọng số thị trường
 
     // Giới hạn điểm 0-100
     finalScore = Math.max(0, Math.min(100, finalScore));
 
-    // 3. Đưa ra nhận định
-    let verdict = 'THEO DÕI';
-    if (finalScore >= 80) verdict = 'MUA MẠNH';
-    else if (finalScore >= 65) verdict = 'MUA';
-    else if (finalScore <= 30) verdict = 'BÁN';
+    // 4. Tổng hợp danh sách lý do cụ thể
+    const reasons = [];
+    if (tickerData.rsi < 30) reasons.push("Vùng quá bán cực đại (RSI < 30), xác suất hồi phục cao.");
+    if (tickerData.rsi > 70) reasons.push("Vùng quá mua rủi ro (RSI > 70), áp lực chốt lời lớn.");
+    if (tickerData.mfi < 20) reasons.push("Dòng tiền cạn kiệt (MFI < 20), lực cung đã yếu dần.");
+    if (tickerData.volRatio > 1.2) reasons.push("Khối lượng tăng đột biến, có dấu hiệu dòng tiền lớn nhập cuộc.");
+    if (foreign.scoreBonus > 0) reasons.push("Khối ngoại mua ròng tích cực trong 5 phiên gần đây.");
+    if (fundamental.isGood) reasons.push("Nền tảng cơ bản tốt (ROE > 10%, định giá P/E hợp lý).");
+    if (!market.isBear) reasons.push("Thị trường chung đang trong xu hướng ổn định (VN-Index > MA50).");
+    
+    // Lý do về MA
+    if (tickerData.price > tickerData.ma20) reasons.push("Xác nhận xu hướng tăng ngắn hạn (Giá > MA20).");
+    if (tickerData.price > tickerData.ma50) reasons.push("Xác nhận xu hướng tăng trung hạn (Giá > MA50).");
+    if (tickerData.price < tickerData.ma50) reasons.push("Giá vẫn nằm dưới MA50, cần cẩn trọng bẫy tăng giá.");
 
-    // 4. Quản trị rủi ro
+    const recommendationReason = reasons.length > 0 ? reasons.join(" ") : "Dữ liệu trung lập, chưa có tín hiệu đột biến.";
+
+    // 5. Quản trị rủi ro
     const stopLossPct = market.isBear ? 5 : 7;
     const currentPrice = tickerData.price;
+    const verdict = finalScore > 60 ? "MUA" : (finalScore > 40 ? "THEO DÕI" : "BÁN/TRÁNH");
     
     return {
       ticker: symbol,
       rating: `${finalScore}/100`,
       verdict,
+      reasons,
+      recommendationReason,
       analysis: {
         fundamental: `${fundamental.label} (${fundamental.details})`,
-        technical: `RSI: ${tickerData.rsi}, MFI: ${tickerData.mfi}, Xu hướng: ${tickerData.price > tickerData.ma50 ? 'Tăng' : 'Giảm'}`,
+        technical: `RSI: ${tickerData.rsi}, MA20: ${tickerData.ma20?.toFixed(0)}, MA50: ${tickerData.ma50?.toFixed(0)}`,
         big_money: foreign.sentiment,
         market: market.status
       },
       risk_management: {
-        stop_loss: `Giá hiện tại - ${stopLossPct}% (${(currentPrice * (1 - stopLossPct/100)).toLocaleString()}đ)`,
+        stop_loss: `Cắt lỗ tại -${stopLossPct}% (${(currentPrice * (1 - stopLossPct/100)).toLocaleString()}đ)`,
         take_profit: `Target 1 (RSI chạm 70), Target 2 (Vùng đỉnh cũ)`
       },
       isBear: market.isBear

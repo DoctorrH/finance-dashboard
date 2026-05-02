@@ -236,11 +236,12 @@ export async function fetchStockData() {
       const rsi = calculateRSI(history);
       const mfi = calculateMFI(history);
       const ma50 = calculateMA(history, 50);
+      const ma20 = calculateMA(history, 20);
       const volMA20 = calculateVolMA(history, 20);
       const volRatio = volMA20 > 0 ? latest.volume / volMA20 : 1;
       
       const analysis = getRecommendation({
-        rsi, mfi, volRatio, ma50,
+        rsi, mfi, volRatio, ma50, ma20,
         price: latest.close,
         changePercent: Number(changePercent.toFixed(2))
       });
@@ -254,6 +255,7 @@ export async function fetchStockData() {
         rsi,
         mfi,
         ma50,
+        ma20,
         volMA20,
         volRatio,
         prediction: analysis.action,
