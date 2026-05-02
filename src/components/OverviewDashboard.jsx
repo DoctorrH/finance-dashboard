@@ -269,7 +269,7 @@ export default function OverviewDashboard({ stockData, uid }) {
             <TrendingUp size={18} color="#10b981" /> Thu Chi 6 Tháng Gần Nhất
           </h3>
           
-          <div className="bar-chart-container" style={{ display: 'flex', alignItems: 'flex-end', height: '180px', gap: '1rem', paddingTop: '1rem', position: 'relative' }}>
+          <div className="bar-chart-container" style={{ display: 'flex', alignItems: 'flex-end', height: '220px', gap: '1rem', paddingTop: '1rem', position: 'relative' }}>
             {last6Months.map(m => {
               const incomeHeight = Math.max((m.income / maxChartValue) * 100, 2); // min 2%
               const expenseHeight = Math.max((m.expense / maxChartValue) * 100, 2); // min 2%
@@ -277,48 +277,18 @@ export default function OverviewDashboard({ stockData, uid }) {
               return (
                 <div key={m.label} className="chart-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                   <div className="bars" style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '100%', width: '100%', justifyContent: 'center' }}>
-                    <div className="bar income-bar" style={{ height: `${incomeHeight}%`, width: '15px', background: 'linear-gradient(to top, #059669, #10b981)', borderRadius: '4px 4px 0 0' }} title={`Thu: ${formatVND(m.income)}`}></div>
-                    <div className="bar expense-bar" style={{ height: `${expenseHeight}%`, width: '15px', background: 'linear-gradient(to top, #b91c1c, #ef4444)', borderRadius: '4px 4px 0 0' }} title={`Chi: ${formatVND(m.expense)}`}></div>
+                    <div className="bar income-bar" style={{ height: `${incomeHeight}%`, width: '20px', background: 'linear-gradient(to top, #059669, #10b981)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Thu: ${formatVND(m.income)}`}></div>
+                    <div className="bar expense-bar" style={{ height: `${expenseHeight}%`, width: '20px', background: 'linear-gradient(to top, #b91c1c, #ef4444)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Chi: ${formatVND(m.expense)}`}></div>
                   </div>
-                  <div className="chart-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{m.label}</div>
+                  <div className="chart-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{m.label}</div>
                 </div>
               );
             })}
           </div>
 
-          {/* Detailed Table */}
-          <div style={{ marginTop: '1.5rem', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}>
-                  <th style={{ padding: '0.5rem' }}>Tháng</th>
-                  <th>Thu Nhập</th>
-                  <th>Chi Tiêu</th>
-                  <th style={{ textAlign: 'right' }}>Thặng Dư</th>
-                </tr>
-              </thead>
-              <tbody>
-                {last6Months.map(m => {
-                  const net = m.income - m.expense;
-                  return (
-                    <tr key={m.label} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                      <td style={{ padding: '0.5rem', fontWeight: 600 }}>{m.label}/{m.year}</td>
-                      <td style={{ color: '#10b981' }}>{formatVND(m.income)}</td>
-                      <td style={{ color: '#ef4444' }}>{formatVND(m.expense)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: net >= 0 ? '#10b981' : '#ef4444' }}>
-                        {net >= 0 ? '+' : ''}{formatVND(net)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem', fontSize: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '2px' }}></span> Thu</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: '#ef4444', borderRadius: '2px' }}></span> Chi</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)' }}><Activity size={10} /> Real-time</div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1.2rem', fontSize: '0.85rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '10px', height: '10px', background: '#10b981', borderRadius: '2px' }}></span> Tổng Thu</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '10px', height: '10px', background: '#ef4444', borderRadius: '2px' }}></span> Tổng Chi</div>
           </div>
         </div>
 
