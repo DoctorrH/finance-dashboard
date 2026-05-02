@@ -130,6 +130,7 @@ function Dashboard({ user }) {
     async function getAdvancedReport() {
       if (!selectedTicker) return;
       try {
+        setFinalReport(null); // Xóa báo cáo cũ ngay lập tức
         setIsReportLoading(true);
         const report = await engine.generateFinalReport(selectedTicker, holding);
         setFinalReport(report);
@@ -140,7 +141,7 @@ function Dashboard({ user }) {
       }
     }
     getAdvancedReport();
-  }, [selectedTicker, portfolio]);
+  }, [selectedTicker]); // Giảm dependency xuống chỉ còn selectedTicker để tránh trigger dư thừa
 
   useEffect(() => {
     async function loadData() {
@@ -487,7 +488,7 @@ function Dashboard({ user }) {
                   <div className="analysis-header" style={{color: getSignalColor(aiPrediction), display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
                       <Lightbulb size={18} />
-                      AI Robo-Advisor: {aiPrediction} ({finalReport?.rating || '0/100'})
+                      AI Robo-Advisor [{selectedTicker.symbol}]: {aiPrediction} ({finalReport?.rating || '0/100'})
                     </div>
                     {isReportLoading && <Loader2 size={14} className="animate-spin" />}
                   </div>

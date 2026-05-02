@@ -7,6 +7,9 @@ export class AnalysisEngine {
   constructor() {
     this.marketSentiment = 'Neutral'; // 'Bull', 'Bear', 'Neutral'
     this.vnIndexMA50 = 0;
+    this.marketStatus = null; // Cache cho kết quả market
+    this.lastMarketCheck = 0;
+    this.reportCache = new Map(); // Cache cho kết quả báo cáo
   }
 
   /**
@@ -86,8 +89,14 @@ export class AnalysisEngine {
    * Kiểm tra VN-Index so với MA50
    */
   async getMarketSentiment() {
+    const now = Date.now();
+    // Cache kết quả thị trường trong 5 phút
+    if (this.marketStatus && (now - this.lastMarketCheck < 5 * 60 * 1000)) {
+      return this.marketStatus;
+    }
+
     try {
-      const to = Math.floor(Date.now() / 1000);
+      const to = Math.floor(now / 1000);
       const from = to - (6 * 30 * 24 * 60 * 60);
       const response = await fetch(`/api/dchart/history?resolution=D&symbol=VNINDEX&from=${from}&to=${to}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -101,13 +110,17 @@ export class AnalysisEngine {
         const ma50 = prices.slice(-50).reduce((a, b) => a + b, 0) / 50;
         this.vnIndexMA50 = ma50;
 
+        this.lastMarketCheck = now;
         if (latest > ma50 * 1.02) {
           this.marketSentiment = 'Bull';
-          return { status: 'Hưng phấn', isBear: false };
+          this.marketStatus = { status: 'Hưng phấn', isBear: false };
         } else if (latest < ma50 * 0.98) {
           this.marketSentiment = 'Bear';
-          return { status: 'Hoảng loạn/Rủi ro', isBear: true };
+          this.marketStatus = { status: 'Hoảng loạn/Rủi ro', isBear: true };
+        } else {
+          this.marketStatus = { status: 'Trung lập', isBear: false };
         }
+        return this.marketStatus;
       }
       return { status: 'Trung lập', isBear: false };
     } catch (err) {
@@ -120,7 +133,16 @@ export class AnalysisEngine {
    */
   async generateFinalReport(tickerData, holding = null) {
     const symbol = tickerData.symbol;
+    const now = Date.now();
     
+    // Kiểm tra cache (lưu trong 2 phút)
+    if (this.reportCache.has(symbol)) {
+      const cached = this.reportCache.get(symbol);
+      if (now - cached.timestamp < 2 * 60 * 1000) {
+        return cached.data;
+      }
+    }
+
     // Chạy song song các bộ lọc để tối ưu hiệu năng
     const [fundamental, foreign, market] = await Promise.all([
       this.checkFundamental(symbol),
@@ -174,7 +196,7 @@ export class AnalysisEngine {
     const stopLossPct = market.isBear ? 5 : 7;
     const currentPrice = tickerData.price;
     
-    return {
+    const report = {
       ticker: symbol,
       rating: `${finalScore}/100`,
       verdict,
@@ -192,6 +214,14 @@ export class AnalysisEngine {
       },
       isBear: market.isBear
     };
+
+    // Lưu vào cache
+    this.reportCache.set(symbol, {
+      timestamp: now,
+      data: report
+    });
+
+    return report;
   }
 }
 
