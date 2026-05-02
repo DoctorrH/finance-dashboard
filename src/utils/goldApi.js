@@ -122,8 +122,8 @@ export async function fetchDomesticGold() {
 export async function fetchWorldGold() {
   try {
     const timestamp = Date.now();
-    // Dùng nến 1 giờ (1h) và phạm vi 1 tháng (1mo) để biểu đồ đầy đủ hơn
-    const res = await fetch(`/api/yahoo/v8/finance/chart/GC=F?interval=1h&range=1mo&_=${timestamp}`);
+    // Quay lại nến Ngày (1d) để đảm bảo biểu đồ luôn hiển thị ổn định
+    const res = await fetch(`/api/yahoo/v8/finance/chart/GC=F?interval=1d&range=6mo&_=${timestamp}`);
     if (!res.ok) throw new Error('Yahoo proxy failed');
     const data = await res.json();
     
