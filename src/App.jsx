@@ -162,7 +162,7 @@ function Dashboard({ user }) {
     }
     
     loadData();
-    const timer = setInterval(loadData, 30000);
+    const timer = setInterval(loadData, 3600000); // 1 hour
     return () => clearInterval(timer);
   }, []);
 

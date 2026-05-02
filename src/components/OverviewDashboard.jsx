@@ -38,8 +38,8 @@ export default function OverviewDashboard({ stockData, uid }) {
     const loadGold = () => fetchDomesticGold().then(setDomesticGold).catch(console.error);
     loadGold();
 
-    // Refresh gold prices every 60 seconds
-    const goldTimer = setInterval(loadGold, 60000);
+    // Refresh gold prices every 1 hour
+    const goldTimer = setInterval(loadGold, 3600000);
 
     return () => {
       unsubPortfolio();
