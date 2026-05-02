@@ -264,6 +264,18 @@ function DebtsTab({ debts, setDebts, uid }) {
     return months > 0 ? months.toString() : '0';
   };
 
+  const autoCalcTotal = (principal, rate, start, due) => {
+    const p = parseFloat(principal);
+    const r = parseFloat(rate);
+    const m = parseInt(calculateMonths(start, due));
+    if (isNaN(p) || isNaN(r) || isNaN(m) || m <= 0) return null;
+    
+    // Giả định trả gốc hàng tháng để tính tổng nợ dự kiến
+    const schedule = calculateLoanSchedule(p, r, m, 1);
+    const totalInterest = schedule.reduce((s, item) => s + item.interest, 0);
+    return Math.round(p + totalInterest).toString();
+  };
+
   const handleFormChange = (field, value) => {
     const newForm = { ...form, [field]: value };
     
