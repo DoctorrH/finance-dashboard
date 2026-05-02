@@ -97,7 +97,7 @@ export default function PortfolioManager({ portfolio, stockData, onAddHolding, o
         </button>
       </div>
 
-      {isAdding && (
+      {isAdding && !isEditMode && (
         <form className="add-holding-form" onSubmit={handleAdd}>
           <input 
             type="text" 
@@ -106,8 +106,6 @@ export default function PortfolioManager({ portfolio, stockData, onAddHolding, o
             onChange={e => setSymbol(e.target.value.toUpperCase())}
             required
             className="input-field"
-            disabled={isEditMode}
-            style={{ opacity: isEditMode ? 0.6 : 1 }}
           />
           <input 
             type="number" 
@@ -129,7 +127,7 @@ export default function PortfolioManager({ portfolio, stockData, onAddHolding, o
             className="input-field"
           />
           <button type="submit" className="btn-submit">
-            {isEditMode ? 'Cập Nhật' : 'Lưu'}
+            Lưu
           </button>
         </form>
       )}
@@ -139,45 +137,82 @@ export default function PortfolioManager({ portfolio, stockData, onAddHolding, o
           <div className="empty-state">Chưa có cổ phiếu nào trong danh mục.</div>
         )}
         {holdings.map(item => (
-          <div 
-            key={item.symbol} 
-            className={`portfolio-item ${selectedTicker?.symbol === item.symbol ? 'selected' : ''}`}
-            onClick={() => onSelectTicker(item.liveData)}
-          >
-            <div className="item-main">
-              <span className="item-symbol">{item.symbol}</span>
-              <span className="item-vol">{item.volume.toLocaleString()} CP</span>
-            </div>
-            <div className="item-price">
-              <span>{item.currentPrice.toFixed(2)}</span>
-              <span className="item-cost">Vốn: {item.buyPrice.toFixed(2)}</span>
-            </div>
-            <div className={`item-pl ${item.pl >= 0 ? 'up' : 'down'}`}>
-              <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem' }}>
-                {(item.value * 1000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ₫
+          <React.Fragment key={item.symbol}>
+            <div 
+              className={`portfolio-item ${selectedTicker?.symbol === item.symbol ? 'selected' : ''}`}
+              onClick={() => onSelectTicker(item.liveData)}
+            >
+              <div className="item-main">
+                <span className="item-symbol">{item.symbol}</span>
+                <span className="item-vol">{item.volume.toLocaleString()} CP</span>
               </div>
-              <div style={{ fontSize: '0.75rem' }}>
-                {item.pl >= 0 ? '+' : ''}{item.plPercent.toFixed(2)}%
+              <div className="item-price">
+                <span>{item.currentPrice.toFixed(2)}</span>
+                <span className="item-cost">Vốn: {item.buyPrice.toFixed(2)}</span>
+              </div>
+              <div className={`item-pl ${item.pl >= 0 ? 'up' : 'down'}`}>
+                <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                  {(item.value * 1000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ₫
+                </div>
+                <div style={{ fontSize: '0.75rem' }}>
+                  {item.pl >= 0 ? '+' : ''}{item.plPercent.toFixed(2)}%
+                </div>
+              </div>
+              <div style={{display: 'flex', gap: '4px'}}>
+                <button 
+                  className="btn-edit" 
+                  onClick={(e) => handleEditClick(e, item)}
+                >
+                  <Pencil size={16} />
+                </button>
+                <button 
+                  className="btn-delete" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveHolding(item.symbol);
+                  }}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             </div>
-            <div style={{display: 'flex', gap: '4px'}}>
-              <button 
-                className="btn-edit" 
-                onClick={(e) => handleEditClick(e, item)}
-              >
-                <Pencil size={16} />
-              </button>
-              <button 
-                className="btn-delete" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemoveHolding(item.symbol);
-                }}
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
+
+            {/* Inline Edit Form */}
+            {isEditMode && symbol === item.symbol && (
+              <form className="add-holding-form inline-edit" onSubmit={handleAdd} style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
+                <input 
+                  type="text" 
+                  value={symbol} 
+                  disabled
+                  className="input-field"
+                  style={{ opacity: 0.6 }}
+                />
+                <input 
+                  type="number" 
+                  placeholder="Giá Mua (VND)" 
+                  value={buyPrice} 
+                  onChange={e => setBuyPrice(e.target.value)}
+                  min="0"
+                  step="0.01"
+                  required
+                  className="input-field"
+                />
+                <input 
+                  type="number" 
+                  placeholder="Khối Lượng" 
+                  value={volume} 
+                  onChange={e => setVolume(e.target.value)}
+                  min="1"
+                  required
+                  className="input-field"
+                />
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button type="submit" className="btn-submit" style={{ flex: 1 }}>Cập Nhật</button>
+                  <button type="button" className="btn-cancel" onClick={resetForm} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Hủy</button>
+                </div>
+              </form>
+            )}
+          </React.Fragment>
         ))}
       </div>
     </div>

@@ -207,8 +207,8 @@ export default function GoldDashboard({ uid }) {
               </button>
             </div>
 
-            {/* Form */}
-            {showForm && (
+            {/* Form (Add New only) */}
+            {showForm && !editId && (
               <div className="add-holding-form">
                 <input type="text" className="input-field" placeholder="Tên (VD: Vàng SJC 1 lượng)" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                 <select className="input-field" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
@@ -230,7 +230,7 @@ export default function GoldDashboard({ uid }) {
                 <input type="number" className="input-field" placeholder="Giá mua (VNĐ / lượng)" value={form.buyPrice} onChange={e => setForm({ ...form, buyPrice: e.target.value })} />
                 <input type="date" className="input-field" value={form.buyDate} onChange={e => setForm({ ...form, buyDate: e.target.value })} />
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> {editId ? 'Cập nhật' : 'Thêm'}</button>
+                  <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Thêm</button>
                   <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
                 </div>
               </div>
@@ -248,25 +248,56 @@ export default function GoldDashboard({ uid }) {
                 const plPct = invested > 0 ? (pl / invested) * 100 : 0;
 
                 return (
-                  <div key={h.id} className="portfolio-item" style={{ gridTemplateColumns: '2fr 2fr 2fr auto' }}>
-                    <div className="item-main">
-                      <div className="item-symbol" style={{ color: '#f59e0b' }}>{h.name}</div>
-                      <div className="item-vol">{h.weight} {h.unit} · {h.type}</div>
-                      <div className="item-vol">{new Date(h.buyDate).toLocaleDateString('vi-VN')}</div>
+                  <React.Fragment key={h.id}>
+                    <div className="portfolio-item" style={{ gridTemplateColumns: '2fr 2fr 2fr auto' }}>
+                      <div className="item-main">
+                        <div className="item-symbol" style={{ color: '#f59e0b' }}>{h.name}</div>
+                        <div className="item-vol">{h.weight} {h.unit} · {h.type}</div>
+                        <div className="item-vol">{new Date(h.buyDate).toLocaleDateString('vi-VN')}</div>
+                      </div>
+                      <div className="item-price">
+                        <span>{formatVND(currentPrice)}</span>
+                        <span className="item-cost">Mua: {formatVND(h.buyPrice)}</span>
+                      </div>
+                      <div className="item-pl" style={{ color: pl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                        {pl >= 0 ? '+' : ''}{formatVND(pl)}
+                        <div style={{ fontSize: '0.75rem' }}>({plPct >= 0 ? '+' : ''}{plPct.toFixed(2)}%)</div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <button className="btn-edit" onClick={() => handleEdit(h)}><Edit3 size={14} /></button>
+                        <button className="btn-delete" onClick={() => handleDelete(h.id)}><Trash2 size={14} /></button>
+                      </div>
                     </div>
-                    <div className="item-price">
-                      <span>{formatVND(currentPrice)}</span>
-                      <span className="item-cost">Mua: {formatVND(h.buyPrice)}</span>
-                    </div>
-                    <div className="item-pl" style={{ color: pl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                      {pl >= 0 ? '+' : ''}{formatVND(pl)}
-                      <div style={{ fontSize: '0.75rem' }}>({plPct >= 0 ? '+' : ''}{plPct.toFixed(2)}%)</div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <button className="btn-edit" onClick={() => handleEdit(h)}><Edit3 size={14} /></button>
-                      <button className="btn-delete" onClick={() => handleDelete(h.id)}><Trash2 size={14} /></button>
-                    </div>
-                  </div>
+
+                    {/* Inline Edit Form */}
+                    {editId === h.id && (
+                      <div className="add-holding-form inline-edit" style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
+                        <input type="text" className="input-field" placeholder="Tên" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                        <select className="input-field" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+                          <option value="SJC">SJC</option>
+                          <option value="DOJI">DOJI</option>
+                          <option value="PNJ">PNJ</option>
+                          <option value="Bảo Tín">Bảo Tín Minh Châu</option>
+                          <option value="Nhẫn">Nhẫn tròn 9999</option>
+                          <option value="Khác">Khác</option>
+                        </select>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <input type="number" className="input-field" placeholder="Khối lượng" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} style={{ flex: 2 }} />
+                          <select className="input-field" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} style={{ flex: 1 }}>
+                            <option value="lượng">Lượng</option>
+                            <option value="chỉ">Chỉ</option>
+                            <option value="cây">Cây</option>
+                          </select>
+                        </div>
+                        <input type="number" className="input-field" placeholder="Giá mua (VNĐ / lượng)" value={form.buyPrice} onChange={e => setForm({ ...form, buyPrice: e.target.value })} />
+                        <input type="date" className="input-field" value={form.buyDate} onChange={e => setForm({ ...form, buyDate: e.target.value })} />
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Cập nhật</button>
+                          <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
+                        </div>
+                      </div>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </div>

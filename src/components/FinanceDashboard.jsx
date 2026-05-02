@@ -158,7 +158,8 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
       </div>
 
       {/* Form */}
-      {showForm && (
+      {/* Form (Add New only) */}
+      {showForm && !editId && (
         <div className="finance-form">
           <div className="finance-form-row">
             <button className={`type-btn ${form.type === 'income' ? 'active-income' : ''}`} onClick={() => setForm({ ...form, type: 'income', category: 'Lương' })}>
@@ -175,7 +176,7 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
           <input type="text" className="input-field" placeholder="Ghi chú" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
           <input type="date" className="input-field" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
           <div className="finance-form-actions">
-            <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> {editId ? 'Cập nhật' : 'Thêm'}</button>
+            <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Thêm</button>
             <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
           </div>
         </div>
@@ -186,23 +187,49 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
         {filtered.length === 0 ? (
           <div className="empty-state">Chưa có giao dịch nào trong {months[filterMonth]} {filterYear}</div>
         ) : filtered.map(t => (
-          <div key={t.id} className={`transaction-item ${t.type}`}>
-            <div className="transaction-icon">
-              {t.type === 'income' ? <ArrowUpCircle size={18} /> : <ArrowDownCircle size={18} />}
+          <React.Fragment key={t.id}>
+            <div className={`transaction-item ${t.type}`}>
+              <div className="transaction-icon">
+                {t.type === 'income' ? <ArrowUpCircle size={18} /> : <ArrowDownCircle size={18} />}
+              </div>
+              <div className="transaction-info">
+                <div className="transaction-category">{t.category}</div>
+                <div className="transaction-note">{t.note || '—'}</div>
+              </div>
+              <div className="transaction-date">{new Date(t.date).toLocaleDateString('vi-VN')}</div>
+              <div className={`transaction-amount ${t.type}`}>
+                {t.type === 'income' ? '+' : '-'}{formatVND(t.amount)}
+              </div>
+              <div className="transaction-actions">
+                <button className="btn-edit" onClick={() => handleEdit(t)}><Edit3 size={14} /></button>
+                <button className="btn-delete" onClick={() => handleDelete(t.id)}><Trash2 size={14} /></button>
+              </div>
             </div>
-            <div className="transaction-info">
-              <div className="transaction-category">{t.category}</div>
-              <div className="transaction-note">{t.note || '—'}</div>
-            </div>
-            <div className="transaction-date">{new Date(t.date).toLocaleDateString('vi-VN')}</div>
-            <div className={`transaction-amount ${t.type}`}>
-              {t.type === 'income' ? '+' : '-'}{formatVND(t.amount)}
-            </div>
-            <div className="transaction-actions">
-              <button className="btn-edit" onClick={() => handleEdit(t)}><Edit3 size={14} /></button>
-              <button className="btn-delete" onClick={() => handleDelete(t.id)}><Trash2 size={14} /></button>
-            </div>
-          </div>
+            
+            {/* Inline Edit Form */}
+            {editId === t.id && (
+              <div className="finance-form inline-edit">
+                <div className="finance-form-row">
+                  <button className={`type-btn ${form.type === 'income' ? 'active-income' : ''}`} onClick={() => setForm({ ...form, type: 'income', category: 'Lương' })}>
+                    <ArrowUpCircle size={14} /> Thu nhập
+                  </button>
+                  <button className={`type-btn ${form.type === 'expense' ? 'active-expense' : ''}`} onClick={() => setForm({ ...form, type: 'expense', category: 'Ăn uống' })}>
+                    <ArrowDownCircle size={14} /> Chi tiêu
+                  </button>
+                </div>
+                <input type="number" className="input-field" placeholder="Số tiền (VNĐ)" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+                <select className="input-field" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+                  {(form.type === 'income' ? CATEGORIES_INCOME : CATEGORIES_EXPENSE).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input type="text" className="input-field" placeholder="Ghi chú" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
+                <input type="date" className="input-field" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+                <div className="finance-form-actions">
+                  <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Cập nhật</button>
+                  <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
+                </div>
+              </div>
+            )}
+          </React.Fragment>
         ))}
       </div>
     </div>
@@ -229,27 +256,32 @@ function DebtsTab({ debts, setDebts, uid }) {
   const [payTotal, setPayTotal] = useState('');
   const [showScheduleId, setShowScheduleId] = useState(null);
 
-  // Auto-calculate totalPayable when principal, rate, dates change
-  const autoCalcTotal = (principal, rate, start, due) => {
-    const p = parseFloat(principal) || 0;
-    const r = parseFloat(rate) || 0;
-    if (!p || !r || !start || !due) return '';
-    const years = (new Date(due) - new Date(start)) / (365.25 * 24 * 60 * 60 * 1000);
-    if (years <= 0) return p.toString();
-    return Math.round(p * (1 + r / 100 * years)).toString();
+  const calculateMonths = (start, due) => {
+    if (!start || !due) return '';
+    const d1 = new Date(start);
+    const d2 = new Date(due);
+    const months = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+    return months > 0 ? months.toString() : '0';
   };
 
   const handleFormChange = (field, value) => {
     const newForm = { ...form, [field]: value };
-    // Auto-calc when relevant fields change
+    
+    // Auto-calc totalPayable and durationMonths
     if (['principalAmount', 'interestRate', 'startDate', 'dueDate'].includes(field)) {
-      const calc = autoCalcTotal(
+      const calcTotal = autoCalcTotal(
         field === 'principalAmount' ? value : newForm.principalAmount,
         field === 'interestRate' ? value : newForm.interestRate,
         field === 'startDate' ? value : newForm.startDate,
         field === 'dueDate' ? value : newForm.dueDate
       );
-      if (calc) newForm.totalPayable = calc;
+      if (calcTotal) newForm.totalPayable = calcTotal;
+
+      const calcMonths = calculateMonths(
+        field === 'startDate' ? value : newForm.startDate,
+        field === 'dueDate' ? value : newForm.dueDate
+      );
+      if (calcMonths) newForm.durationMonths = calcMonths;
     }
     setForm(newForm);
   };
@@ -391,7 +423,8 @@ function DebtsTab({ debts, setDebts, uid }) {
         </button>
       </div>
 
-      {showForm && (
+      {/* Form (Add New only) */}
+      {showForm && !editId && (
         <div className="finance-form">
           <input type="text" className="input-field" placeholder="Tên khoản nợ" value={form.name} onChange={e => handleFormChange('name', e.target.value)} />
           <div className="finance-form-row">
@@ -410,7 +443,7 @@ function DebtsTab({ debts, setDebts, uid }) {
               <input type="date" className="input-field" value={form.startDate} onChange={e => handleFormChange('startDate', e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <label className="form-label">Hạn trả</label>
+              <label className="form-label">Hạn trả (Để trống nếu Linh hoạt)</label>
               <input type="date" className="input-field" value={form.dueDate} onChange={e => handleFormChange('dueDate', e.target.value)} />
             </div>
           </div>
@@ -418,21 +451,18 @@ function DebtsTab({ debts, setDebts, uid }) {
             <label className="form-label" style={{ color: '#f59e0b' }}>Tổng phải trả khi đến hạn (Tự tính = Gốc + Lãi)</label>
             <input type="number" className="input-field" placeholder="Tự động tính hoặc nhập tay" value={form.totalPayable} onChange={e => handleFormChange('totalPayable', e.target.value)} />
           </div>
-          <select className="input-field" value={form.repaymentSchedule} onChange={e => handleFormChange('repaymentSchedule', e.target.value)}>
-            {REPAYMENT_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
           <div className="finance-form-row">
             <div style={{ flex: 1 }}>
-              <label className="form-label">Tần suất trả gốc (tháng/lần)</label>
-              <input type="number" className="input-field" placeholder="VD: 6 (Trả mỗi 6 tháng)" value={form.principalFreq} onChange={e => handleFormChange('principalFreq', e.target.value)} />
+              <label className="form-label">Tần suất trả gốc (tháng/lần, 0 = Linh hoạt)</label>
+              <input type="number" className="input-field" placeholder="VD: 1 (Hàng tháng)" value={form.principalFreq} onChange={e => handleFormChange('principalFreq', e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
               <label className="form-label">Thời gian vay (tháng)</label>
-              <input type="number" className="input-field" placeholder="VD: 24" value={form.durationMonths || '12'} onChange={e => handleFormChange('durationMonths', e.target.value)} />
+              <input type="number" className="input-field" placeholder="Tự động tính" value={form.durationMonths} onChange={e => handleFormChange('durationMonths', e.target.value)} />
             </div>
           </div>
           <div className="finance-form-actions">
-            <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> {editId ? 'Cập nhật' : 'Thêm'}</button>
+            <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Thêm</button>
             <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
           </div>
         </div>
@@ -453,121 +483,172 @@ function DebtsTab({ debts, setDebts, uid }) {
           const interestTotal = d.totalPayable - d.principalAmount;
 
           return (
-            <div key={d.id} className={`debt-card ${isCompleted ? 'completed' : ''} ${isOverdue ? 'overdue' : ''}`}>
-              <div className="debt-header">
-                <div className="debt-name">
-                  {d.name}
-                  {isCompleted && <span className="debt-badge done">Đã xong</span>}
-                  {isOverdue && <span className="debt-badge overdue">Quá hạn</span>}
-                </div>
-                <div style={{ display: 'flex', gap: '0.25rem' }}>
-                  <button className="btn-edit" onClick={() => handleEdit(d)}><Edit3 size={14} /></button>
-                  <button className="btn-delete" onClick={() => handleDelete(d.id)}><Trash2 size={14} /></button>
-                </div>
-              </div>
-              <div className="debt-details">
-                <span>Gốc: {formatVND(d.principalAmount)}</span>
-                <span>Lãi: {formatVND(interestTotal)}</span>
-                <span>Lãi suất: {d.interestRate}%/năm</span>
-                <span>Trả: {d.repaymentSchedule}</span>
-              </div>
-              <div className="debt-dates">
-                <span>Vay: {new Date(d.startDate).toLocaleDateString('vi-VN')}</span>
-                {d.dueDate && <span>Hạn: {new Date(d.dueDate).toLocaleDateString('vi-VN')}</span>}
-              </div>
-
-              {/* Progress Bar 1: Nợ gốc */}
-              <div className="debt-progress-container">
-                <div className="debt-progress-label">
-                  <span>📌 Nợ gốc</span>
-                  <span className="debt-pct">{principalPct.toFixed(1)}%</span>
-                </div>
-                <div className="debt-progress-bar">
-                  <div className="debt-progress-fill principal" style={{ width: `${Math.min(principalPct, 100)}%` }}></div>
-                </div>
-                <div className="debt-progress-text">
-                  <span>Đã trả gốc: {formatVND(d.principalPaid)}</span>
-                  <span>Còn: {formatVND(Math.max(principalRemain, 0))}</span>
-                </div>
-              </div>
-
-              {/* Progress Bar 2: Tổng phải trả */}
-              <div className="debt-progress-container">
-                <div className="debt-progress-label">
-                  <span>💰 Tổng phải trả</span>
-                  <span className="debt-pct">{totalPct.toFixed(1)}%</span>
-                </div>
-                <div className="debt-progress-bar">
-                  <div className="debt-progress-fill total" style={{ width: `${Math.min(totalPct, 100)}%` }}></div>
-                </div>
-                <div className="debt-progress-text">
-                  <span>Đã trả tổng: {formatVND(d.totalPaid)}</span>
-                  <span>Còn: {formatVND(Math.max(totalRemain, 0))}</span>
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              {!isCompleted && (
-                <div className="debt-actions">
-                  <button className="debt-action-btn" onClick={() => { setActionId(d.id); setActionType('pay'); }}>💰 Trả nợ</button>
-                  <button className="debt-action-btn" onClick={() => { setActionId(d.id); setActionType('borrow'); }}>➕ Vay thêm</button>
-                  <button className="debt-action-btn" onClick={() => setShowScheduleId(showScheduleId === d.id ? null : d.id)}>📅 Lịch trả</button>
-                </div>
-              )}
-
-              {actionId === d.id && (
-                <div className="debt-action-form">
-                  <input 
-                    type="number" 
-                    className="input-field" 
-                    placeholder={actionType === 'pay' ? "Số tiền trả gốc (VNĐ)" : "Số tiền vay thêm (VNĐ)"}
-                    value={payPrincipal} 
-                    onChange={e => setPayPrincipal(e.target.value)} 
-                  />
-                  <div className="finance-form-actions">
-                    <button className="btn-submit" onClick={() => actionType === 'pay' ? handlePayment(d.id) : handleBorrow(d.id)}>Xác nhận</button>
-                    <button className="btn-cancel" onClick={() => setActionId(null)}>Hủy</button>
+            <React.Fragment key={d.id}>
+              <div className={`debt-card ${isCompleted ? 'completed' : ''} ${isOverdue ? 'overdue' : ''}`}>
+                <div className="debt-header">
+                  <div className="debt-name">
+                    {d.name}
+                    {isCompleted && <span className="debt-badge done">Đã xong</span>}
+                    {isOverdue && <span className="debt-badge overdue">Quá hạn</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <button className="btn-edit" onClick={() => handleEdit(d)}><Edit3 size={14} /></button>
+                    <button className="btn-delete" onClick={() => handleDelete(d.id)}><Trash2 size={14} /></button>
                   </div>
                 </div>
-              )}
+                <div className="debt-details">
+                  <span>Gốc: {formatVND(d.principalAmount)}</span>
+                  <span>Lãi: {formatVND(interestTotal)}</span>
+                  <span>Lãi suất: {d.interestRate}%/năm</span>
+                  <span>Trả: {(!d.principalFreq || d.principalFreq === '0') ? 'Linh hoạt' : `${d.principalFreq} tháng/lần`}</span>
+                </div>
+                <div className="debt-dates">
+                  <span>Vay: {new Date(d.startDate).toLocaleDateString('vi-VN')}</span>
+                  {d.dueDate ? (
+                    <span>Hạn: {new Date(d.dueDate).toLocaleDateString('vi-VN')}</span>
+                  ) : (
+                    <span>Hạn: Linh hoạt</span>
+                  )}
+                </div>
 
-              {showScheduleId === d.id && (
-                <div className="repayment-schedule-box" style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Lịch trả nợ dự kiến (Dư nợ giảm dần)</span>
-                    <span style={{ color: 'var(--accent-green)' }}>{d.interestRate}%/năm</span>
+                {/* Progress Bar 1: Nợ gốc */}
+                <div className="debt-progress-container">
+                  <div className="debt-progress-label">
+                    <span>📌 Nợ gốc</span>
+                    <span className="debt-pct">{principalPct.toFixed(1)}%</span>
                   </div>
-                  <div style={{ maxHeight: '200px', overflowY: 'auto', fontSize: '0.75rem' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead style={{ position: 'sticky', top: 0, background: '#1a1d21' }}>
-                        <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                          <th style={{ padding: '0.4rem' }}>Kỳ</th>
-                          <th>Gốc</th>
-                          <th>Lãi</th>
-                          <th>Còn lại</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {calculateLoanSchedule(
-                          d.principalAmount, 
-                          d.interestRate, 
-                          parseInt(d.durationMonths || 12), 
-                          parseInt(d.principalFreq || 1),
-                          d.additions || []
-                        ).map(s => (
-                          <tr key={s.month} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                            <td style={{ padding: '0.4rem' }}>T.{s.month}</td>
-                            <td style={{ color: s.principal > 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{s.principal > 0 ? formatVND(s.principal) : '-'}</td>
-                            <td style={{ color: 'var(--accent-red)' }}>{formatVND(s.interest)}</td>
-                            <td>{formatVND(s.remaining)}</td>
+                  <div className="debt-progress-bar">
+                    <div className="debt-progress-fill principal" style={{ width: `${Math.min(principalPct, 100)}%` }}></div>
+                  </div>
+                  <div className="debt-progress-text">
+                    <span>Đã trả gốc: {formatVND(d.principalPaid)}</span>
+                    <span>Còn: {formatVND(Math.max(principalRemain, 0))}</span>
+                  </div>
+                </div>
+
+                {/* Progress Bar 2: Tổng phải trả */}
+                <div className="debt-progress-container">
+                  <div className="debt-progress-label">
+                    <span>💰 Tổng phải trả</span>
+                    <span className="debt-pct">{totalPct.toFixed(1)}%</span>
+                  </div>
+                  <div className="debt-progress-bar">
+                    <div className="debt-progress-fill total" style={{ width: `${Math.min(totalPct, 100)}%` }}></div>
+                  </div>
+                  <div className="debt-progress-text">
+                    <span>Đã trả tổng: {formatVND(d.totalPaid)}</span>
+                    <span>Còn: {formatVND(Math.max(totalRemain, 0))}</span>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                {!isCompleted && (
+                  <div className="debt-actions">
+                    <button className="debt-action-btn" onClick={() => { setActionId(d.id); setActionType('pay'); }}>💰 Trả nợ</button>
+                    <button className="debt-action-btn" onClick={() => { setActionId(d.id); setActionType('borrow'); }}>➕ Vay thêm</button>
+                    <button className="debt-action-btn" onClick={() => setShowScheduleId(showScheduleId === d.id ? null : d.id)}>📅 Lịch trả</button>
+                  </div>
+                )}
+
+                {actionId === d.id && (
+                  <div className="debt-action-form">
+                    <input 
+                      type="number" 
+                      className="input-field" 
+                      placeholder={actionType === 'pay' ? "Số tiền trả gốc (VNĐ)" : "Số tiền vay thêm (VNĐ)"}
+                      value={payPrincipal} 
+                      onChange={e => setPayPrincipal(e.target.value)} 
+                    />
+                    <div className="finance-form-actions">
+                      <button className="btn-submit" onClick={() => actionType === 'pay' ? handlePayment(d.id) : handleBorrow(d.id)}>Xác nhận</button>
+                      <button className="btn-cancel" onClick={() => setActionId(null)}>Hủy</button>
+                    </div>
+                  </div>
+                )}
+
+                {showScheduleId === d.id && (
+                  <div className="repayment-schedule-box" style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Lịch trả nợ dự kiến (Dư nợ giảm dần)</span>
+                      <span style={{ color: 'var(--accent-green)' }}>{d.interestRate}%/năm</span>
+                    </div>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto', fontSize: '0.75rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: '#1a1d21' }}>
+                          <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                            <th style={{ padding: '0.4rem' }}>Kỳ</th>
+                            <th>Gốc</th>
+                            <th>Lãi</th>
+                            <th>Còn lại</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {calculateLoanSchedule(
+                            d.principalAmount, 
+                            d.interestRate, 
+                            parseInt(d.durationMonths || 12), 
+                            parseInt(d.principalFreq || 1),
+                            d.additions || []
+                          ).map(s => (
+                            <tr key={s.month} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                              <td style={{ padding: '0.4rem' }}>T.{s.month}</td>
+                              <td style={{ color: s.principal > 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{s.principal > 0 ? formatVND(s.principal) : '-'}</td>
+                              <td style={{ color: 'var(--accent-red)' }}>{formatVND(s.interest)}</td>
+                              <td>{formatVND(s.remaining)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Inline Edit Form */}
+              {editId === d.id && (
+                <div className="finance-form inline-edit">
+                  <input type="text" className="input-field" placeholder="Tên khoản nợ" value={form.name} onChange={e => handleFormChange('name', e.target.value)} />
+                  <div className="finance-form-row">
+                    <div style={{ flex: 1 }}>
+                      <label className="form-label">Nợ gốc (VNĐ)</label>
+                      <input type="number" className="input-field" placeholder="Số tiền gốc" value={form.principalAmount} onChange={e => handleFormChange('principalAmount', e.target.value)} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label className="form-label">Lãi suất (%/năm)</label>
+                      <input type="number" className="input-field" placeholder="VD: 12" value={form.interestRate} onChange={e => handleFormChange('interestRate', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="finance-form-row">
+                    <div style={{ flex: 1 }}>
+                      <label className="form-label">Ngày vay</label>
+                      <input type="date" className="input-field" value={form.startDate} onChange={e => handleFormChange('startDate', e.target.value)} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label className="form-label">Hạn trả (Để trống nếu Linh hoạt)</label>
+                      <input type="date" className="input-field" value={form.dueDate} onChange={e => handleFormChange('dueDate', e.target.value)} />
+                    </div>
+                  </div>
+                  <div style={{ background: 'rgba(245, 158, 11, 0.08)', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                    <label className="form-label" style={{ color: '#f59e0b' }}>Tổng phải trả khi đến hạn (Tự tính = Gốc + Lãi)</label>
+                    <input type="number" className="input-field" placeholder="Tự động tính hoặc nhập tay" value={form.totalPayable} onChange={e => handleFormChange('totalPayable', e.target.value)} />
+                  </div>
+                  <div className="finance-form-row">
+                    <div style={{ flex: 1 }}>
+                      <label className="form-label">Tần suất trả gốc (tháng/lần, 0 = Linh hoạt)</label>
+                      <input type="number" className="input-field" placeholder="VD: 1 (Hàng tháng)" value={form.principalFreq} onChange={e => handleFormChange('principalFreq', e.target.value)} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label className="form-label">Thời gian vay (tháng)</label>
+                      <input type="number" className="input-field" placeholder="Tự động tính" value={form.durationMonths} onChange={e => handleFormChange('durationMonths', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="finance-form-actions">
+                    <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Cập nhật</button>
+                    <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
                   </div>
                 </div>
               )}
-            </div>
+            </React.Fragment>
           );
         })}
       </div>
@@ -667,13 +748,14 @@ function SavingsTab({ savings, setSavings, uid }) {
         </button>
       </div>
 
-      {showForm && (
+      {/* Form (Add New only) */}
+      {showForm && !editId && (
         <div className="finance-form">
           <input type="text" className="input-field" placeholder="Tên mục tiêu (VD: Mua xe, Du lịch...)" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           <input type="number" className="input-field" placeholder="Số tiền mục tiêu (VNĐ)" value={form.targetAmount} onChange={e => setForm({ ...form, targetAmount: e.target.value })} />
           <input type="number" className="input-field" placeholder="Số tiền hiện có (VNĐ)" value={form.currentAmount} onChange={e => setForm({ ...form, currentAmount: e.target.value })} />
           <div className="finance-form-actions">
-            <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> {editId ? 'Cập nhật' : 'Tạo'}</button>
+            <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Tạo</button>
             <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
           </div>
         </div>
@@ -688,48 +770,63 @@ function SavingsTab({ savings, setSavings, uid }) {
           const isCompleted = progress >= 100;
 
           return (
-            <div key={g.id} className={`savings-card ${isCompleted ? 'completed' : ''}`}>
-              <div className="savings-header">
-                <div className="savings-name">{g.name}</div>
-                <div style={{ display: 'flex', gap: '0.25rem' }}>
-                  <button className="btn-edit" onClick={() => handleEdit(g)}><Edit3 size={14} /></button>
-                  <button className="btn-delete" onClick={() => handleDelete(g.id)}><Trash2 size={14} /></button>
+            <React.Fragment key={g.id}>
+              <div className={`savings-card ${isCompleted ? 'completed' : ''}`}>
+                <div className="savings-header">
+                  <div className="savings-name">{g.name}</div>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <button className="btn-edit" onClick={() => handleEdit(g)}><Edit3 size={14} /></button>
+                    <button className="btn-delete" onClick={() => handleDelete(g.id)}><Trash2 size={14} /></button>
+                  </div>
                 </div>
+
+                <div className="savings-progress-ring">
+                  <svg viewBox="0 0 100 100" className="progress-svg">
+                    <circle className="progress-bg" cx="50" cy="50" r="42" />
+                    <circle className="progress-fill" cx="50" cy="50" r="42" 
+                      strokeDasharray={`${Math.min(progress, 100) * 2.639} 263.9`}
+                      style={{ stroke: isCompleted ? 'var(--accent-green)' : '#3b82f6' }}
+                    />
+                  </svg>
+                  <div className="progress-text">{Math.min(progress, 100).toFixed(0)}%</div>
+                </div>
+
+                <div className="savings-amounts">
+                  <div><span className="savings-label">Hiện có:</span> {formatVND(g.currentAmount)}</div>
+                  <div><span className="savings-label">Mục tiêu:</span> {formatVND(g.targetAmount)}</div>
+                  <div><span className="savings-label">Còn thiếu:</span> {formatVND(Math.max(g.targetAmount - g.currentAmount, 0))}</div>
+                </div>
+
+                {!isCompleted && (
+                  <>
+                    <button className="savings-deposit-btn" onClick={() => { setDepositId(g.id); setDepositAmount(''); }}>
+                      <Plus size={14} /> Nạp thêm
+                    </button>
+                    {depositId === g.id && (
+                      <div className="debt-action-form">
+                        <input type="number" className="input-field" placeholder="Số tiền nạp" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
+                        <button className="btn-submit small" onClick={() => handleDeposit(g.id)}><Check size={14} /></button>
+                        <button className="btn-cancel small" onClick={() => setDepositId(null)}><X size={14} /></button>
+                      </div>
+                    )}
+                  </>
+                )}
+                {isCompleted && <div className="savings-completed-badge">🎉 Hoàn thành!</div>}
               </div>
 
-              <div className="savings-progress-ring">
-                <svg viewBox="0 0 100 100" className="progress-svg">
-                  <circle className="progress-bg" cx="50" cy="50" r="42" />
-                  <circle className="progress-fill" cx="50" cy="50" r="42" 
-                    strokeDasharray={`${Math.min(progress, 100) * 2.639} 263.9`}
-                    style={{ stroke: isCompleted ? 'var(--accent-green)' : '#3b82f6' }}
-                  />
-                </svg>
-                <div className="progress-text">{Math.min(progress, 100).toFixed(0)}%</div>
-              </div>
-
-              <div className="savings-amounts">
-                <div><span className="savings-label">Hiện có:</span> {formatVND(g.currentAmount)}</div>
-                <div><span className="savings-label">Mục tiêu:</span> {formatVND(g.targetAmount)}</div>
-                <div><span className="savings-label">Còn thiếu:</span> {formatVND(Math.max(g.targetAmount - g.currentAmount, 0))}</div>
-              </div>
-
-              {!isCompleted && (
-                <>
-                  <button className="savings-deposit-btn" onClick={() => { setDepositId(g.id); setDepositAmount(''); }}>
-                    <Plus size={14} /> Nạp thêm
-                  </button>
-                  {depositId === g.id && (
-                    <div className="debt-action-form">
-                      <input type="number" className="input-field" placeholder="Số tiền nạp" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
-                      <button className="btn-submit small" onClick={() => handleDeposit(g.id)}><Check size={14} /></button>
-                      <button className="btn-cancel small" onClick={() => setDepositId(null)}><X size={14} /></button>
-                    </div>
-                  )}
-                </>
+              {/* Inline Edit Form */}
+              {editId === g.id && (
+                <div className="finance-form inline-edit" style={{ marginTop: '1rem' }}>
+                  <input type="text" className="input-field" placeholder="Tên mục tiêu" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                  <input type="number" className="input-field" placeholder="Số tiền mục tiêu (VNĐ)" value={form.targetAmount} onChange={e => setForm({ ...form, targetAmount: e.target.value })} />
+                  <input type="number" className="input-field" placeholder="Số tiền hiện có (VNĐ)" value={form.currentAmount} onChange={e => setForm({ ...form, currentAmount: e.target.value })} />
+                  <div className="finance-form-actions">
+                    <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Cập nhật</button>
+                    <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
+                  </div>
+                </div>
               )}
-              {isCompleted && <div className="savings-completed-badge">🎉 Hoàn thành!</div>}
-            </div>
+            </React.Fragment>
           );
         })}
       </div>

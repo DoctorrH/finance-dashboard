@@ -40,11 +40,13 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthChange(async (firebaseUser) => {
+    const unsubscribe = onAuthChange((firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        // Migrate old data on first login
-        await migrateOldData(firebaseUser.uid);
+        // Chạy migration nền — không chờ migrate xong mới tắt loading (tránh màn tối + spinner quá lâu)
+        migrateOldData(firebaseUser.uid).catch((err) =>
+          console.error('migrateOldData failed:', err),
+        );
       } else {
         setUser(null);
       }
