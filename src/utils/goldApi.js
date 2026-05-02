@@ -122,7 +122,7 @@ export async function fetchDomesticGold() {
 export async function fetchWorldGold() {
   try {
     const timestamp = Date.now();
-    const res = await fetch(`/api/yahoo/v8/finance/chart/XAUUSD=X?interval=1d&range=6mo&_=${timestamp}`);
+    const res = await fetch(`/api/yahoo/v8/finance/chart/GC=F?interval=1d&range=6mo&_=${timestamp}`);
     if (!res.ok) throw new Error('Yahoo proxy failed');
     const data = await res.json();
     
