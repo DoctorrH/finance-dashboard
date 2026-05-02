@@ -165,10 +165,14 @@ export class AnalysisEngine {
 
     const recommendationReason = reasons.length > 0 ? reasons.join(" ") : "Dữ liệu trung lập, chưa có tín hiệu đột biến.";
 
-    // 5. Quản trị rủi ro
+    // 5. Đưa ra nhận định cuối cùng
+    let verdict = 'THEO DÕI';
+    if (finalScore >= 80) verdict = 'MUA MẠNH';
+    else if (finalScore >= 65) verdict = 'MUA';
+    else if (finalScore <= 40) verdict = 'BÁN / CẨN TRỌNG';
+
     const stopLossPct = market.isBear ? 5 : 7;
     const currentPrice = tickerData.price;
-    const verdict = finalScore > 60 ? "MUA" : (finalScore > 40 ? "THEO DÕI" : "BÁN/TRÁNH");
     
     return {
       ticker: symbol,

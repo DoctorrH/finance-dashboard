@@ -9,7 +9,7 @@ import FinanceDashboard from './components/FinanceDashboard';
 import OverviewDashboard from './components/OverviewDashboard';
 import LoginPage from './components/LoginPage';
 import StockScanner from './components/StockScanner';
-import { Activity, TrendingUp, TrendingDown, Clock, Loader2, Lightbulb, Briefcase, BarChart2, Wallet, PieChart, LogOut, Search } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Clock, Loader2, Lightbulb, Briefcase, BarChart2, Wallet, PieChart, LogOut, Search, Check } from 'lucide-react';
 import { savePortfolioToFirebase, subscribeToPortfolio, onAuthChange, signOutUser, migrateOldData } from './firebase';
 
 class ErrorBoundary extends React.Component {
