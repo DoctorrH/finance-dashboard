@@ -162,6 +162,8 @@ function Dashboard({ user }) {
     }
     
     loadData();
+    const timer = setInterval(loadData, 30000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleAddHolding = (holding, isEditMode) => {

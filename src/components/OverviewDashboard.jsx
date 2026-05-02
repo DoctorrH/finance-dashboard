@@ -35,8 +35,11 @@ export default function OverviewDashboard({ stockData, uid }) {
     const unsubSavings = subscribeSavings(uid, setSavings);
     const unsubHistory = subscribeAssetHistory(uid, setAssetHistory);
 
-    // Fetch gold prices
-    fetchDomesticGold().then(setDomesticGold).catch(console.error);
+    const loadGold = () => fetchDomesticGold().then(setDomesticGold).catch(console.error);
+    loadGold();
+
+    // Refresh gold prices every 60 seconds
+    const goldTimer = setInterval(loadGold, 60000);
 
     return () => {
       unsubPortfolio();
@@ -45,6 +48,7 @@ export default function OverviewDashboard({ stockData, uid }) {
       unsubDebts();
       unsubSavings();
       unsubHistory();
+      clearInterval(goldTimer);
     };
   }, [uid]);
 
@@ -84,31 +88,35 @@ export default function OverviewDashboard({ stockData, uid }) {
   const currentExpense = currentMonthTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const netMonthly = currentIncome - currentExpense;
 
-  // --- 5. Biểu đồ 6 tháng gần nhất ---
-  const last6Months = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    last6Months.push({
-      month: d.getMonth(),
-      year: d.getFullYear(),
-      label: `T${d.getMonth() + 1}`,
-      income: 0,
-      expense: 0
-    });
-  }
-
-  transactions.forEach(t => {
-    const d = new Date(t.date);
-    const m = d.getMonth();
-    const y = d.getFullYear();
-    const target = last6Months.find(x => x.month === m && x.year === y);
-    if (target) {
-      if (t.type === 'income') target.income += t.amount;
-      else target.expense += t.amount;
+  // --- 5. Biểu đồ & Bảng 6 tháng gần nhất ---
+  const { last6Months, maxChartValue } = React.useMemo(() => {
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        label: `T${d.getMonth() + 1}`,
+        income: 0,
+        expense: 0
+      });
     }
-  });
 
-  const maxChartValue = Math.max(...last6Months.map(m => Math.max(m.income, m.expense)), 1000000); // Tối thiểu 1tr để chart không trống
+    transactions.forEach(t => {
+      const d = new Date(t.date);
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      const target = months.find(x => x.month === m && x.year === y);
+      if (target) {
+        if (t.type === 'income') target.income += t.amount;
+        else target.expense += t.amount;
+      }
+    });
+
+    const maxValue = Math.max(...months.map(m => Math.max(m.income, m.expense)), 1000000);
+    return { last6Months: months, maxChartValue: maxValue };
+  }, [transactions]);
 
   // --- 6. Biểu đồ Tăng Trưởng Tài Sản 12 Tháng ---
   const lastSavedAssets = React.useRef(0);
@@ -261,7 +269,7 @@ export default function OverviewDashboard({ stockData, uid }) {
             <TrendingUp size={18} color="#10b981" /> Thu Chi 6 Tháng Gần Nhất
           </h3>
           
-          <div className="bar-chart-container" style={{ display: 'flex', alignItems: 'flex-end', height: '200px', gap: '1rem', paddingTop: '1rem', position: 'relative' }}>
+          <div className="bar-chart-container" style={{ display: 'flex', alignItems: 'flex-end', height: '180px', gap: '1rem', paddingTop: '1rem', position: 'relative' }}>
             {last6Months.map(m => {
               const incomeHeight = Math.max((m.income / maxChartValue) * 100, 2); // min 2%
               const expenseHeight = Math.max((m.expense / maxChartValue) * 100, 2); // min 2%
@@ -269,17 +277,48 @@ export default function OverviewDashboard({ stockData, uid }) {
               return (
                 <div key={m.label} className="chart-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                   <div className="bars" style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '100%', width: '100%', justifyContent: 'center' }}>
-                    <div className="bar income-bar" style={{ height: `${incomeHeight}%`, width: '20px', background: 'linear-gradient(to top, #059669, #10b981)', borderRadius: '4px 4px 0 0' }} title={`Thu: ${formatVND(m.income)}`}></div>
-                    <div className="bar expense-bar" style={{ height: `${expenseHeight}%`, width: '20px', background: 'linear-gradient(to top, #b91c1c, #ef4444)', borderRadius: '4px 4px 0 0' }} title={`Chi: ${formatVND(m.expense)}`}></div>
+                    <div className="bar income-bar" style={{ height: `${incomeHeight}%`, width: '15px', background: 'linear-gradient(to top, #059669, #10b981)', borderRadius: '4px 4px 0 0' }} title={`Thu: ${formatVND(m.income)}`}></div>
+                    <div className="bar expense-bar" style={{ height: `${expenseHeight}%`, width: '15px', background: 'linear-gradient(to top, #b91c1c, #ef4444)', borderRadius: '4px 4px 0 0' }} title={`Chi: ${formatVND(m.expense)}`}></div>
                   </div>
-                  <div className="chart-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{m.label}</div>
+                  <div className="chart-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{m.label}</div>
                 </div>
               );
             })}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem', fontSize: '0.85rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '10px', height: '10px', background: '#10b981', borderRadius: '2px' }}></span> Tổng Thu</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '10px', height: '10px', background: '#ef4444', borderRadius: '2px' }}></span> Tổng Chi</div>
+
+          {/* Detailed Table */}
+          <div style={{ marginTop: '1.5rem', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '0.5rem' }}>Tháng</th>
+                  <th>Thu Nhập</th>
+                  <th>Chi Tiêu</th>
+                  <th style={{ textAlign: 'right' }}>Thặng Dư</th>
+                </tr>
+              </thead>
+              <tbody>
+                {last6Months.map(m => {
+                  const net = m.income - m.expense;
+                  return (
+                    <tr key={m.label} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <td style={{ padding: '0.5rem', fontWeight: 600 }}>{m.label}/{m.year}</td>
+                      <td style={{ color: '#10b981' }}>{formatVND(m.income)}</td>
+                      <td style={{ color: '#ef4444' }}>{formatVND(m.expense)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: net >= 0 ? '#10b981' : '#ef4444' }}>
+                        {net >= 0 ? '+' : ''}{formatVND(net)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem', fontSize: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '2px' }}></span> Thu</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: '#ef4444', borderRadius: '2px' }}></span> Chi</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)' }}><Activity size={10} /> Real-time</div>
           </div>
         </div>
 

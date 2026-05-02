@@ -242,9 +242,10 @@ function DebtsTab({ debts, setDebts, uid }) {
     name: '', principalAmount: '', totalPayable: '', 
     principalPaid: '0', totalPaid: '0', interestRate: '0', 
     startDate: new Date().toISOString().slice(0, 10), dueDate: '', 
+    durationMonths: '12',
     repaymentSchedule: 'Hàng tháng',
-    isSmart: true, // Mặc định dùng chế độ thông minh
-    principalFreq: '1' // Mặc định trả gốc mỗi tháng
+    isSmart: true, 
+    principalFreq: '1' 
   };
 
   const [showForm, setShowForm] = useState(false);
@@ -264,14 +265,14 @@ function DebtsTab({ debts, setDebts, uid }) {
     return months > 0 ? months.toString() : '0';
   };
 
-  const autoCalcTotal = (principal, rate, start, due) => {
+  const autoCalcTotal = (principal, rate, months, freq) => {
     const p = parseFloat(principal);
     const r = parseFloat(rate);
-    const m = parseInt(calculateMonths(start, due));
+    const m = parseInt(months);
     if (isNaN(p) || isNaN(r) || isNaN(m) || m <= 0) return null;
     
-    // Giả định trả gốc hàng tháng để tính tổng nợ dự kiến
-    const schedule = calculateLoanSchedule(p, r, m, 1);
+    // Tính tổng nợ dựa trên số tháng và tần suất trả gốc
+    const schedule = calculateLoanSchedule(p, r, m, parseInt(freq) || 1);
     const totalInterest = schedule.reduce((s, item) => s + item.interest, 0);
     return Math.round(p + totalInterest).toString();
   };
@@ -279,21 +280,24 @@ function DebtsTab({ debts, setDebts, uid }) {
   const handleFormChange = (field, value) => {
     const newForm = { ...form, [field]: value };
     
-    // Auto-calc totalPayable and durationMonths
-    if (['principalAmount', 'interestRate', 'startDate', 'dueDate'].includes(field)) {
+    // Auto-calc totalPayable
+    if (['principalAmount', 'interestRate', 'durationMonths', 'principalFreq'].includes(field)) {
       const calcTotal = autoCalcTotal(
         field === 'principalAmount' ? value : newForm.principalAmount,
         field === 'interestRate' ? value : newForm.interestRate,
-        field === 'startDate' ? value : newForm.startDate,
-        field === 'dueDate' ? value : newForm.dueDate
+        field === 'durationMonths' ? value : newForm.durationMonths,
+        field === 'principalFreq' ? value : newForm.principalFreq
       );
       if (calcTotal) newForm.totalPayable = calcTotal;
-
-      const calcMonths = calculateMonths(
-        field === 'startDate' ? value : newForm.startDate,
-        field === 'dueDate' ? value : newForm.dueDate
-      );
-      if (calcMonths) newForm.durationMonths = calcMonths;
+      
+      // Auto-update dueDate based on startDate + durationMonths
+      const start = new Date(field === 'startDate' ? value : newForm.startDate);
+      const m = parseInt(field === 'durationMonths' ? value : newForm.durationMonths);
+      if (!isNaN(start.getTime()) && !isNaN(m)) {
+        const due = new Date(start);
+        due.setMonth(due.getMonth() + m);
+        newForm.dueDate = due.toISOString().slice(0, 10);
+      }
     }
     setForm(newForm);
   };
@@ -388,6 +392,8 @@ function DebtsTab({ debts, setDebts, uid }) {
       interestRate: d.interestRate.toString(),
       startDate: d.startDate,
       dueDate: d.dueDate || '',
+      durationMonths: d.durationMonths || calculateMonths(d.startDate, d.dueDate) || '12',
+      principalFreq: d.principalFreq || '1',
       repaymentSchedule: d.repaymentSchedule
     });
     setEditId(d.id);
@@ -455,22 +461,18 @@ function DebtsTab({ debts, setDebts, uid }) {
               <input type="date" className="input-field" value={form.startDate} onChange={e => handleFormChange('startDate', e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <label className="form-label">Hạn trả (Để trống nếu Linh hoạt)</label>
-              <input type="date" className="input-field" value={form.dueDate} onChange={e => handleFormChange('dueDate', e.target.value)} />
+              <label className="form-label">Thời hạn vay (tháng)</label>
+              <input type="number" className="input-field" placeholder="VD: 12" value={form.durationMonths} onChange={e => handleFormChange('durationMonths', e.target.value)} />
             </div>
-          </div>
-          <div style={{ background: 'rgba(245, 158, 11, 0.08)', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-            <label className="form-label" style={{ color: '#f59e0b' }}>Tổng phải trả khi đến hạn (Tự tính = Gốc + Lãi)</label>
-            <input type="number" className="input-field" placeholder="Tự động tính hoặc nhập tay" value={form.totalPayable} onChange={e => handleFormChange('totalPayable', e.target.value)} />
           </div>
           <div className="finance-form-row">
             <div style={{ flex: 1 }}>
-              <label className="form-label">Tần suất trả gốc (tháng/lần, 0 = Linh hoạt)</label>
+              <label className="form-label">Tần suất trả gốc (tháng/lần)</label>
               <input type="number" className="input-field" placeholder="VD: 1 (Hàng tháng)" value={form.principalFreq} onChange={e => handleFormChange('principalFreq', e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <label className="form-label">Thời gian vay (tháng)</label>
-              <input type="number" className="input-field" placeholder="Tự động tính" value={form.durationMonths} onChange={e => handleFormChange('durationMonths', e.target.value)} />
+              <label className="form-label" style={{ color: '#f59e0b' }}>Tổng nợ (Tự tính = Gốc + Lãi)</label>
+              <input type="number" className="input-field" placeholder="Tự động tính hoặc nhập tay" value={form.totalPayable} onChange={e => handleFormChange('totalPayable', e.target.value)} style={{ borderColor: 'rgba(245, 158, 11, 0.4)' }} />
             </div>
           </div>
           <div className="finance-form-actions">
@@ -636,22 +638,18 @@ function DebtsTab({ debts, setDebts, uid }) {
                       <input type="date" className="input-field" value={form.startDate} onChange={e => handleFormChange('startDate', e.target.value)} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label className="form-label">Hạn trả (Để trống nếu Linh hoạt)</label>
-                      <input type="date" className="input-field" value={form.dueDate} onChange={e => handleFormChange('dueDate', e.target.value)} />
+                      <label className="form-label">Thời hạn vay (tháng)</label>
+                      <input type="number" className="input-field" value={form.durationMonths} onChange={e => handleFormChange('durationMonths', e.target.value)} />
                     </div>
-                  </div>
-                  <div style={{ background: 'rgba(245, 158, 11, 0.08)', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-                    <label className="form-label" style={{ color: '#f59e0b' }}>Tổng phải trả khi đến hạn (Tự tính = Gốc + Lãi)</label>
-                    <input type="number" className="input-field" placeholder="Tự động tính hoặc nhập tay" value={form.totalPayable} onChange={e => handleFormChange('totalPayable', e.target.value)} />
                   </div>
                   <div className="finance-form-row">
                     <div style={{ flex: 1 }}>
-                      <label className="form-label">Tần suất trả gốc (tháng/lần, 0 = Linh hoạt)</label>
-                      <input type="number" className="input-field" placeholder="VD: 1 (Hàng tháng)" value={form.principalFreq} onChange={e => handleFormChange('principalFreq', e.target.value)} />
+                      <label className="form-label">Tần suất trả gốc (tháng/lần)</label>
+                      <input type="number" className="input-field" value={form.principalFreq} onChange={e => handleFormChange('principalFreq', e.target.value)} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label className="form-label">Thời gian vay (tháng)</label>
-                      <input type="number" className="input-field" placeholder="Tự động tính" value={form.durationMonths} onChange={e => handleFormChange('durationMonths', e.target.value)} />
+                      <label className="form-label" style={{ color: '#f59e0b' }}>Tổng nợ (Gốc + Lãi)</label>
+                      <input type="number" className="input-field" value={form.totalPayable} onChange={e => handleFormChange('totalPayable', e.target.value)} style={{ borderColor: 'rgba(245, 158, 11, 0.4)' }} />
                     </div>
                   </div>
                   <div className="finance-form-actions">
