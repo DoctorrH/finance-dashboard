@@ -275,12 +275,12 @@ export default function OverviewDashboard({ stockData, uid }) {
               const expenseHeight = Math.max((m.expense / maxChartValue) * 100, 2); // min 2%
               
               return (
-                <div key={m.label} className="chart-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                  <div className="bars" style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '100%', width: '100%', justifyContent: 'center' }}>
-                    <div className="bar income-bar" style={{ height: `${incomeHeight}%`, width: '20px', background: 'linear-gradient(to top, #059669, #10b981)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Thu: ${formatVND(m.income)}`}></div>
-                    <div className="bar expense-bar" style={{ height: `${expenseHeight}%`, width: '20px', background: 'linear-gradient(to top, #b91c1c, #ef4444)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Chi: ${formatVND(m.expense)}`}></div>
+                <div key={m.label} className="chart-group" style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="bars" style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: '4px', width: '100%', justifyContent: 'center' }}>
+                    <div className="bar income-bar" style={{ height: `${incomeHeight}%`, width: '18px', background: 'linear-gradient(to top, #059669, #10b981)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Thu: ${formatVND(m.income)}`}></div>
+                    <div className="bar expense-bar" style={{ height: `${expenseHeight}%`, width: '18px', background: 'linear-gradient(to top, #b91c1c, #ef4444)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Chi: ${formatVND(m.expense)}`}></div>
                   </div>
-                  <div className="chart-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{m.label}</div>
+                  <div className="chart-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, marginTop: 'auto' }}>{m.label}</div>
                 </div>
               );
             })}
