@@ -223,8 +223,8 @@ function Dashboard({ user }) {
   }
 
   const getSignalColor = (signal) => {
-    if (signal === 'BUY') return 'var(--buy-color)';
-    if (signal === 'SELL') return 'var(--sell-color)';
+    if (signal === 'BUY' || signal === 'MUA' || signal === 'MUA MẠNH') return 'var(--buy-color)';
+    if (signal === 'SELL' || signal === 'BÁN' || signal === 'BÁN / CẨN TRỌNG') return 'var(--sell-color)';
     return 'var(--hold-color)';
   };
 
@@ -485,50 +485,52 @@ function Dashboard({ user }) {
                   </div>
 
                   {finalReport && (
-                    <div className="analysis-grid" style={{ 
-                      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                      gap: '1rem', marginTop: '1rem', fontSize: '0.85rem' 
-                    }}>
-                      <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
-                        <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Chất lượng (Cơ bản)</div>
-                        <div style={{ fontWeight: 600 }}>{finalReport.analysis.fundamental}</div>
+                    <>
+                      <div className="analysis-grid" style={{ 
+                        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                        gap: '1rem', marginTop: '1rem', fontSize: '0.85rem' 
+                      }}>
+                        <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                          <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Chất lượng (Cơ bản)</div>
+                          <div style={{ fontWeight: 600 }}>{finalReport.analysis.fundamental}</div>
+                        </div>
+                        <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                          <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Dòng tiền ngoại</div>
+                          <div style={{ fontWeight: 600 }}>{finalReport.analysis.big_money}</div>
+                        </div>
+                        <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                          <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Bối cảnh thị trường</div>
+                          <div style={{ fontWeight: 600, color: finalReport.isBear ? 'var(--accent-red)' : 'var(--accent-green)' }}>{finalReport.analysis.market}</div>
+                        </div>
+                        <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                          <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Quản trị rủi ro</div>
+                          <div style={{ fontWeight: 600, color: 'var(--accent-red)' }}>SL: {finalReport.risk_management.stop_loss}</div>
+                        </div>
                       </div>
-                      <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
-                        <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Dòng tiền ngoại</div>
-                        <div style={{ fontWeight: 600 }}>{finalReport.analysis.big_money}</div>
+                      
+                      <div className="analysis-content" style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+                        <div style={{ fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+                          <Check size={16} color="var(--accent-green)" /> Lý do từ Robot AI:
+                        </div>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          {finalReport.reasons?.map((reason, idx) => (
+                            <li key={idx} style={{ 
+                              fontSize: '0.85rem', color: 'var(--text-secondary)', 
+                              display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
+                              background: 'rgba(255,255,255,0.02)', padding: '0.6rem', borderRadius: '0.4rem'
+                            }}>
+                              <span style={{ color: 'var(--accent-green)', marginTop: '0.1rem' }}>•</span>
+                              {reason}
+                            </li>
+                          ))}
+                          {(!finalReport.reasons || finalReport.reasons.length === 0) && (
+                            <li style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                              Chưa có tín hiệu kỹ thuật đặc biệt nào được ghi nhận.
+                            </li>
+                          )}
+                        </ul>
                       </div>
-                      <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
-                        <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Bối cảnh thị trường</div>
-                        <div style={{ fontWeight: 600, color: finalReport.isBear ? 'var(--accent-red)' : 'var(--accent-green)' }}>{finalReport.analysis.market}</div>
-                      </div>
-                      <div className="analysis-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '0.5rem' }}>
-                        <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>Quản trị rủi ro</div>
-                        <div style={{ fontWeight: 600, color: 'var(--accent-red)' }}>SL: {finalReport.risk_management.stop_loss}</div>
-                      </div>
-                    </div>
-                    
-                    <div className="analysis-content" style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
-                      <div style={{ fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-                        <Check size={16} color="var(--accent-green)" /> Lý do từ Robot AI:
-                      </div>
-                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                        {finalReport.reasons?.map((reason, idx) => (
-                          <li key={idx} style={{ 
-                            fontSize: '0.85rem', color: 'var(--text-secondary)', 
-                            display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
-                            background: 'rgba(255,255,255,0.02)', padding: '0.6rem', borderRadius: '0.4rem'
-                          }}>
-                            <span style={{ color: 'var(--accent-green)', marginTop: '0.1rem' }}>•</span>
-                            {reason}
-                          </li>
-                        ))}
-                        {(!finalReport.reasons || finalReport.reasons.length === 0) && (
-                          <li style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                            Chưa có tín hiệu kỹ thuật đặc biệt nào được ghi nhận.
-                          </li>
-                        )}
-                      </ul>
-                    </div>
+                    </>
                   )}
                 </div>
               </>

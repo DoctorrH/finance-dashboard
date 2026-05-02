@@ -117,7 +117,7 @@ function calculateMFI(data, period = 14) {
 }
 
 export function getRecommendation(tickerData, holding = null) {
-  const { rsi, mfi, volRatio, price, changePercent, ma50 } = tickerData;
+  const { rsi, mfi, volRatio, price, changePercent, ma50, ma20 } = tickerData;
   const plPercent = holding ? ((price - holding.buyPrice) / holding.buyPrice) * 100 : 0;
   
   let action = 'HOLD';
