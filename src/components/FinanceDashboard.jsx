@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   Plus, Trash2, Edit3, ArrowUpCircle, ArrowDownCircle, 
   Target, CreditCard, PiggyBank, Calendar,
-  TrendingUp, DollarSign, X, Check, BookOpen
+  TrendingUp, DollarSign, X, Check, BookOpen, Wallet
 } from 'lucide-react';
 import { 
   saveTransactions, subscribeTransactions,
   saveDebts, subscribeDebts,
   saveSavings, subscribeSavings,
-  savePassbooks, subscribePassbooks
+  savePassbooks, subscribePassbooks,
+  saveCashOnHand, subscribeCashOnHand
 } from '../firebase';
 
 const CATEGORIES_INCOME = ['Lương', 'Thưởng', 'Đầu tư', 'Freelance', 'Khác'];
@@ -65,7 +66,20 @@ function calculateLoanSchedule(principal, ratePerYear, months, principalFrequenc
 }
 
 // ==================== TAB 1: TRANSACTIONS ====================
-function TransactionsTab({ transactions, setTransactions, uid }) {
+function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpdateCashOnHand, uid }) {
+  const [isEditingCash, setIsEditingCash] = useState(false);
+  const [cashInput, setCashInput] = useState('');
+
+  const handleSaveCash = (e) => {
+    e.preventDefault();
+    const amount = Number(cashInput);
+    if (isNaN(amount) || amount < 0) {
+      alert('Vui lòng nhập số tiền mặt hợp lệ.');
+      return;
+    }
+    onUpdateCashOnHand(amount);
+    setIsEditingCash(false);
+  };
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ type: 'expense', amount: '', category: 'Ăn uống', note: '', date: new Date().toISOString().slice(0, 10) });
@@ -103,8 +117,16 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
     let updated;
     if (editId) {
       updated = transactions.map(t => t.id === editId ? entry : t);
+      const old = transactions.find(t => t.id === editId);
+      if (old) {
+        const reverseDiff = old.type === 'income' ? -old.amount : old.amount;
+        const newDiff = entry.type === 'income' ? amount : -amount;
+        onUpdateCashOnHand(cashOnHand + reverseDiff + newDiff);
+      }
     } else {
       updated = [...transactions, entry];
+      const diff = entry.type === 'income' ? amount : -amount;
+      onUpdateCashOnHand(cashOnHand + diff);
     }
     setTransactions(updated);
     saveTransactions(uid, updated);
@@ -114,9 +136,14 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
   };
 
   const handleDelete = (id) => {
+    const target = transactions.find(t => t.id === id);
     const updated = transactions.filter(t => t.id !== id);
     setTransactions(updated);
     saveTransactions(uid, updated);
+    if (target) {
+      const diff = target.type === 'income' ? -target.amount : target.amount;
+      onUpdateCashOnHand(cashOnHand + diff);
+    }
   };
 
   const handleEdit = (t) => {
@@ -146,10 +173,55 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
           </div>
         </div>
         <div className={`finance-card balance-card ${balance >= 0 ? 'positive' : 'negative'}`}>
-          <DollarSign size={20} />
+          <TrendingUp size={20} />
           <div>
-            <div className="finance-card-label">Số dư</div>
+            <div className="finance-card-label">Thặng dư tháng này</div>
             <div className="finance-card-value">{balance >= 0 ? '+' : ''}{formatVND(balance)}</div>
+          </div>
+        </div>
+        <div className="finance-card balance-card positive" style={{ borderLeftColor: '#8b5cf6', position: 'relative' }}>
+          <Wallet size={20} style={{ color: '#8b5cf6' }} />
+          <div>
+            <div className="finance-card-label">Tiền Đang Có</div>
+            {isEditingCash ? (
+              <form onSubmit={handleSaveCash} style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.25rem' }}>
+                <input
+                  type="number"
+                  value={cashInput}
+                  onChange={(e) => setCashInput(e.target.value)}
+                  className="input-field"
+                  placeholder="Nhập số tiền..."
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box', height: '32px' }}
+                  autoFocus
+                  min="0"
+                />
+                {cashInput && (
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 'bold' }}>
+                    {Number(cashInput).toLocaleString('vi-VN')} ₫
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button type="submit" className="btn-submit" style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', height: '24px', cursor: 'pointer' }}>Lưu</button>
+                  <button type="button" onClick={() => setIsEditingCash(false)} style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', height: '24px', cursor: 'pointer' }}>Hủy</button>
+                </div>
+              </form>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div className="finance-card-value">{formatVND(cashOnHand)}</div>
+                <button
+                  onClick={() => {
+                    setCashInput(cashOnHand.toString());
+                    setIsEditingCash(true);
+                  }}
+                  title="Chỉnh sửa số tiền mặt đang có"
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                >
+                  <Edit3 size={14} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -893,7 +965,7 @@ function SavingsTab({ savings, setSavings, uid }) {
   );
 }
 
-function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, uid }) {
+function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, cashOnHand = 0, onUpdateCashOnHand, uid }) {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [withdrawId, setWithdrawId] = useState(null);
@@ -1064,6 +1136,9 @@ function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, 
     const updatedTransactions = [...transactions, newTransaction];
     setTransactions(updatedTransactions);
     saveTransactions(uid, updatedTransactions);
+    if (onUpdateCashOnHand) {
+      onUpdateCashOnHand(cashOnHand + (principal + actualInterest));
+    }
 
     setWithdrawId(null);
     setActualInterestInput('');
@@ -1295,6 +1370,7 @@ function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, 
 export default function FinanceDashboard({ uid }) {
   const [activeTab, setActiveTab] = useState('transactions');
   const [transactions, setTransactions] = useState([]);
+  const [cashOnHand, setCashOnHand] = useState(0);
   const [debts, setDebts] = useState([]);
   const [savings, setSavings] = useState([]);
   const [passbooks, setPassbooks] = useState([]);
@@ -1305,7 +1381,8 @@ export default function FinanceDashboard({ uid }) {
     const unsub2 = subscribeDebts(uid, setDebts);
     const unsub3 = subscribeSavings(uid, setSavings);
     const unsub4 = subscribePassbooks(uid, setPassbooks);
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
+    const unsub5 = subscribeCashOnHand(uid, setCashOnHand);
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); };
   }, [uid]);
 
   return (
@@ -1327,10 +1404,34 @@ export default function FinanceDashboard({ uid }) {
       </div>
 
       {/* Content */}
-      {activeTab === 'transactions' && <TransactionsTab transactions={transactions} setTransactions={setTransactions} uid={uid} />}
+      {activeTab === 'transactions' && (
+        <TransactionsTab 
+          transactions={transactions} 
+          setTransactions={setTransactions} 
+          cashOnHand={cashOnHand}
+          onUpdateCashOnHand={(amount) => {
+            setCashOnHand(amount);
+            saveCashOnHand(uid, amount);
+          }}
+          uid={uid} 
+        />
+      )}
       {activeTab === 'debts' && <DebtsTab debts={debts} setDebts={setDebts} uid={uid} />}
       {activeTab === 'savings' && <SavingsTab savings={savings} setSavings={setSavings} uid={uid} />}
-      {activeTab === 'passbooks' && <PassbooksTab passbooks={passbooks} setPassbooks={setPassbooks} transactions={transactions} setTransactions={setTransactions} uid={uid} />}
+      {activeTab === 'passbooks' && (
+        <PassbooksTab 
+          passbooks={passbooks} 
+          setPassbooks={setPassbooks} 
+          transactions={transactions} 
+          setTransactions={setTransactions} 
+          cashOnHand={cashOnHand}
+          onUpdateCashOnHand={(amount) => {
+            setCashOnHand(amount);
+            saveCashOnHand(uid, amount);
+          }}
+          uid={uid} 
+        />
+      )}
     </div>
   );
 }

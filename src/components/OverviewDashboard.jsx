@@ -7,7 +7,8 @@ import {
   subscribeGoldHoldings,
   saveAssetHistory,
   subscribeAssetHistory,
-  subscribePassbooks
+  subscribePassbooks,
+  subscribeCashOnHand
 } from '../firebase';
 import { fetchDomesticGold } from '../utils/goldApi';
 import { Wallet, TrendingUp, CreditCard, PiggyBank, Target, Activity } from 'lucide-react';
@@ -25,6 +26,7 @@ export default function OverviewDashboard({ stockData, uid }) {
   const [debts, setDebts] = useState([]);
   const [savings, setSavings] = useState([]);
   const [passbooks, setPassbooks] = useState([]);
+  const [cashOnHand, setCashOnHand] = useState(0);
   const [domesticGold, setDomesticGold] = useState([]);
   const [assetHistory, setAssetHistory] = useState(null);
 
@@ -41,6 +43,7 @@ export default function OverviewDashboard({ stockData, uid }) {
     const unsubSavings = subscribeSavings(uid, setSavings);
     const unsubPassbooks = subscribePassbooks(uid, setPassbooks);
     const unsubHistory = subscribeAssetHistory(uid, setAssetHistory);
+    const unsubCash = subscribeCashOnHand(uid, setCashOnHand);
 
     const loadGold = () => fetchDomesticGold().then(setDomesticGold).catch(console.error);
     loadGold();
@@ -56,6 +59,7 @@ export default function OverviewDashboard({ stockData, uid }) {
       unsubSavings();
       unsubPassbooks();
       unsubHistory();
+      unsubCash();
       clearInterval(goldTimer);
     };
   }, [uid]);
@@ -84,7 +88,7 @@ export default function OverviewDashboard({ stockData, uid }) {
 
   const totalSavings = savings.reduce((sum, s) => sum + s.currentAmount, 0) + 
     passbooks.filter(p => p.status !== 'Đã tất toán').reduce((sum, p) => sum + (parseFloat(p.depositAmount) || 0), 0);
-  const totalAssets = totalStockAccountValue + totalGoldValue + totalSavings;
+  const totalAssets = totalStockAccountValue + totalGoldValue + totalSavings + cashOnHand;
 
   // --- 2. Tính Tổng Nợ ---
   const totalDebt = debts.reduce((sum, d) => sum + (d.principalAmount - d.principalPaid), 0);
@@ -183,6 +187,13 @@ export default function OverviewDashboard({ stockData, uid }) {
           <div className="finance-card-label">Tổng Tiết Kiệm</div>
           <div className="finance-card-value">{formatVND(totalSavings)}</div>
         </div>
+
+        {/* Tiền Đang Có */}
+        <div className="finance-card income-card" style={{ borderLeftColor: '#8b5cf6' }}>
+          <Wallet size={24} style={{ marginBottom: '0.5rem', color: '#8b5cf6' }} />
+          <div className="finance-card-label">Tiền Đang Có</div>
+          <div className="finance-card-value" style={{ color: '#fff' }}>{formatVND(cashOnHand)}</div>
+        </div>
       </div>
 
       {/* Row 2: Asset Distribution (Pie Chart) */}
@@ -198,11 +209,13 @@ export default function OverviewDashboard({ stockData, uid }) {
                 const total = totalAssets || 1;
                 const pStock = (totalStockAccountValue / total) * 100;
                 const pGold = (totalGoldValue / total) * 100;
+                const pCash = (cashOnHand / total) * 100;
                 const r = 40;
                 const circ = 2 * Math.PI * r;
                 return (
                   <>
                     <circle cx="50" cy="50" r={r} fill="transparent" stroke="#10b981" strokeWidth="12" strokeDasharray={`${circ} ${circ}`} strokeDashoffset="0" />
+                    <circle cx="50" cy="50" r={r} fill="transparent" stroke="#8b5cf6" strokeWidth="12" strokeDasharray={`${(pCash + pGold + pStock) / 100 * circ} ${circ}`} strokeDashoffset="0" />
                     <circle cx="50" cy="50" r={r} fill="transparent" stroke="#f59e0b" strokeWidth="12" strokeDasharray={`${(pGold + pStock) / 100 * circ} ${circ}`} strokeDashoffset="0" />
                     <circle cx="50" cy="50" r={r} fill="transparent" stroke="#3b82f6" strokeWidth="12" strokeDasharray={`${pStock / 100 * circ} ${circ}`} strokeDashoffset="0" />
                     <circle cx="50" cy="50" r={r} fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="12" strokeDasharray={totalAssets === 0 ? `${circ} ${circ}` : `0 ${circ}`} />
@@ -238,7 +251,7 @@ export default function OverviewDashboard({ stockData, uid }) {
                 <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>{totalAssets > 0 ? ((totalGoldValue/totalAssets)*100).toFixed(1) : 0}%</div>
               </div>
             </div>
-            <div className="asset-item" style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
+            <div className="asset-item" style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
               <div className="asset-info">
                 <span className="asset-color" style={{ background: '#10b981' }}></span>
                 <span style={{ fontWeight: 600 }}>Tiết Kiệm</span>
@@ -246,6 +259,16 @@ export default function OverviewDashboard({ stockData, uid }) {
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontWeight: 800 }}>{formatVND(totalSavings)}</div>
                 <div style={{ fontSize: '0.75rem', color: '#10b981' }}>{totalAssets > 0 ? ((totalSavings/totalAssets)*100).toFixed(1) : 0}%</div>
+              </div>
+            </div>
+            <div className="asset-item" style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
+              <div className="asset-info">
+                <span className="asset-color" style={{ background: '#8b5cf6' }}></span>
+                <span style={{ fontWeight: 600 }}>Tiển Đang Có</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 800 }}>{formatVND(cashOnHand)}</div>
+                <div style={{ fontSize: '0.75rem', color: '#8b5cf6' }}>{totalAssets > 0 ? ((cashOnHand/totalAssets)*100).toFixed(1) : 0}%</div>
               </div>
             </div>
           </div>

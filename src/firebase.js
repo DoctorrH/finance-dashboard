@@ -75,6 +75,24 @@ export const subscribeTransactions = (uid, callback) => {
   });
 };
 
+export const saveCashOnHand = async (uid, cash) => {
+  try {
+    await setDoc(userDoc(uid, 'transactions'), { cashOnHand: cash }, { merge: true });
+  } catch (err) {
+    console.error("Error saving cash on hand: ", err);
+  }
+};
+
+export const subscribeCashOnHand = (uid, callback) => {
+  return onSnapshot(userDoc(uid, 'transactions'), (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data().cashOnHand || 0);
+    } else {
+      callback(0);
+    }
+  });
+};
+
 // === Debts (Quản lý Nợ) ===
 export const saveDebts = async (uid, data) => {
   try {
