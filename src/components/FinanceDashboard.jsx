@@ -893,7 +893,7 @@ function SavingsTab({ savings, setSavings, uid }) {
   );
 }
 
-function PassbooksTab({ passbooks, setPassbooks, uid }) {
+function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, uid }) {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [withdrawId, setWithdrawId] = useState(null);
@@ -1031,6 +1031,11 @@ function PassbooksTab({ passbooks, setPassbooks, uid }) {
 
   const handleWithdrawSubmit = (id) => {
     const actualInterest = parseFloat(actualInterestInput) || 0;
+    const book = passbooks.find(p => p.id === id);
+    if (!book) return;
+
+    const principal = parseFloat(book.depositAmount) || 0;
+
     const updated = passbooks.map(p => {
       if (p.id === id) {
         return {
@@ -1045,6 +1050,21 @@ function PassbooksTab({ passbooks, setPassbooks, uid }) {
 
     setPassbooks(updated);
     savePassbooks(uid, updated);
+
+    // Tự động tạo giao dịch Thu nhập (Income) cho tiền gốc + lãi nhận được
+    const newTransaction = {
+      id: genId(),
+      type: 'income',
+      amount: principal + actualInterest,
+      category: 'Đầu tư',
+      note: `Tất toán sổ tiết kiệm ${book.bankName} (Gốc: ${formatVND(principal)} + Lãi thực nhận: ${formatVND(actualInterest)})`,
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    const updatedTransactions = [...transactions, newTransaction];
+    setTransactions(updatedTransactions);
+    saveTransactions(uid, updatedTransactions);
+
     setWithdrawId(null);
     setActualInterestInput('');
   };
@@ -1310,7 +1330,7 @@ export default function FinanceDashboard({ uid }) {
       {activeTab === 'transactions' && <TransactionsTab transactions={transactions} setTransactions={setTransactions} uid={uid} />}
       {activeTab === 'debts' && <DebtsTab debts={debts} setDebts={setDebts} uid={uid} />}
       {activeTab === 'savings' && <SavingsTab savings={savings} setSavings={setSavings} uid={uid} />}
-      {activeTab === 'passbooks' && <PassbooksTab passbooks={passbooks} setPassbooks={setPassbooks} uid={uid} />}
+      {activeTab === 'passbooks' && <PassbooksTab passbooks={passbooks} setPassbooks={setPassbooks} transactions={transactions} setTransactions={setTransactions} uid={uid} />}
     </div>
   );
 }
