@@ -101,6 +101,25 @@ export const subscribeSavings = (uid, callback) => {
   });
 };
 
+// === Passbooks (Sổ tiết kiệm) ===
+export const savePassbooks = async (uid, data) => {
+  try {
+    await setDoc(userDoc(uid, 'passbooks'), { items: data }, { merge: true });
+  } catch (err) {
+    console.error("Error saving passbooks: ", err);
+  }
+};
+
+export const subscribePassbooks = (uid, callback) => {
+  return onSnapshot(userDoc(uid, 'passbooks'), (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data().items || []);
+    } else {
+      callback([]);
+    }
+  });
+};
+
 // === Gold Holdings (Vàng đang nắm giữ) ===
 export const saveGoldHoldings = async (uid, data) => {
   try {

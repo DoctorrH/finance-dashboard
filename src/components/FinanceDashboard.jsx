@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Trash2, Edit3, ArrowUpCircle, ArrowDownCircle, 
-  Target, CreditCard, PiggyBank, Calendar, ChevronDown,
-  TrendingUp, TrendingDown, DollarSign, X, Check, MoreHorizontal
+  Target, CreditCard, PiggyBank, Calendar,
+  TrendingUp, DollarSign, X, Check, BookOpen
 } from 'lucide-react';
 import { 
   saveTransactions, subscribeTransactions,
   saveDebts, subscribeDebts,
-  saveSavings, subscribeSavings
+  saveSavings, subscribeSavings,
+  savePassbooks, subscribePassbooks
 } from '../firebase';
 
 const CATEGORIES_INCOME = ['Lương', 'Thưởng', 'Đầu tư', 'Freelance', 'Khác'];
@@ -72,8 +73,20 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
   const now = new Date();
   const [filterMonth, setFilterMonth] = useState(now.getMonth());
   const [filterYear, setFilterYear] = useState(now.getFullYear());
+  const [searchQuery, setSearchQuery] = useState('');
 
   const filtered = transactions.filter(t => {
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase().trim();
+      const matchesNote = t.note?.toLowerCase().includes(query);
+      const matchesCategory = t.category?.toLowerCase().includes(query);
+      const matchesAmount = t.amount?.toString().includes(query);
+      const dateObj = new Date(t.date);
+      const matchesDate = dateObj.toLocaleDateString('vi-VN').includes(query);
+      
+      return matchesNote || matchesCategory || matchesAmount || matchesDate;
+    }
+
     const d = new Date(t.date);
     return d.getMonth() === filterMonth && d.getFullYear() === filterYear;
   }).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -141,21 +154,52 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
         </div>
       </div>
 
-      {/* Filter & Add */}
-      <div className="finance-toolbar">
-        <div className="finance-filter">
+      {/* Filter, Search & Add */}
+      <div className="finance-toolbar" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="finance-filter" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <Calendar size={16} />
-          <select value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))} className="finance-select">
+          <select value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))} className="finance-select" disabled={searchQuery.trim() !== ''}>
             {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
-          <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} className="finance-select">
+          <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} className="finance-select" disabled={searchQuery.trim() !== ''}>
             {Array.from({ length: 81 }, (_, i) => 2020 + i).map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
+
+        {/* Search Input */}
+        <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
+          <input 
+            type="text" 
+            className="input-field" 
+            placeholder="Tìm kiếm danh mục, ghi chú, số tiền..." 
+            value={searchQuery} 
+            onChange={e => setSearchQuery(e.target.value)} 
+            style={{ margin: 0, paddingRight: '2rem' }}
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              style={{ 
+                position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+                background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
         <button className="btn-add" onClick={() => { setShowForm(!showForm); setEditId(null); }}>
           <Plus size={16} /> Thêm
         </button>
       </div>
+
+      {searchQuery.trim() !== '' && (
+        <div style={{ fontSize: '0.85rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(245, 158, 11, 0.08)', padding: '0.6rem 0.8rem', borderRadius: '0.5rem', marginTop: '-0.25rem', border: '1px solid rgba(245, 158, 11, 0.15)' }}>
+          <span>🔍 Đang tìm kiếm toàn bộ lịch sử (Tìm thấy {filtered.length} kết quả).</span>
+        </div>
+      )}
 
       {/* Form */}
       {/* Form (Add New only) */}
@@ -185,7 +229,12 @@ function TransactionsTab({ transactions, setTransactions, uid }) {
       {/* Transaction List */}
       <div className="transaction-list">
         {filtered.length === 0 ? (
-          <div className="empty-state">Chưa có giao dịch nào trong {months[filterMonth]} {filterYear}</div>
+          <div className="empty-state">
+            {searchQuery.trim() !== '' 
+              ? `Không tìm thấy kết quả phù hợp với "${searchQuery}"`
+              : `Chưa có giao dịch nào trong ${months[filterMonth]} ${filterYear}`
+            }
+          </div>
         ) : filtered.map(t => (
           <React.Fragment key={t.id}>
             <div className={`transaction-item ${t.type}`}>
@@ -844,19 +893,399 @@ function SavingsTab({ savings, setSavings, uid }) {
   );
 }
 
+function PassbooksTab({ passbooks, setPassbooks, uid }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [withdrawId, setWithdrawId] = useState(null);
+  const [actualInterestInput, setActualInterestInput] = useState('');
+
+  const DEFAULT_FORM = {
+    bankName: '',
+    depositAmount: '',
+    interestRate: '',
+    term: '12 tháng',
+    startDate: new Date().toISOString().split('T')[0],
+    maturityMethod: 'Tự động quay vòng gốc và lãi',
+    note: '',
+    status: 'Đang gửi'
+  };
+
+  const [form, setForm] = useState(DEFAULT_FORM);
+
+  const TERMS = ['Không kỳ hạn', '1 tháng', '3 tháng', '6 tháng', '9 tháng', '12 tháng', '18 tháng', '24 tháng', '36 tháng'];
+  const MATURITY_METHODS = ['Tự động quay vòng gốc và lãi', 'Tự động quay vòng gốc', 'Tất toán khi đáo hạn'];
+
+  const getMaturityDate = (startDateStr, term) => {
+    if (term === 'Không kỳ hạn') return null;
+    const date = new Date(startDateStr);
+    const months = parseInt(term);
+    if (isNaN(months)) return null;
+    date.setMonth(date.getMonth() + months);
+    return date;
+  };
+
+  const getProjectedInterest = (amount, rate, term) => {
+    const principal = parseFloat(amount) || 0;
+    const r = parseFloat(rate) || 0;
+    if (term === 'Không kỳ hạn') {
+      return principal * (r / 100) * (1 / 12);
+    }
+    const months = parseInt(term);
+    if (isNaN(months)) return 0;
+    return principal * (r / 100) * (months / 12);
+  };
+
+  const getProgressInfo = (startDateStr, term) => {
+    const maturity = getMaturityDate(startDateStr, term);
+    if (!maturity) return { pct: 0, daysRemaining: null, isMatured: false };
+
+    const start = new Date(startDateStr).getTime();
+    const end = maturity.getTime();
+    const now = new Date().getTime();
+
+    if (now >= end) return { pct: 100, daysRemaining: 0, isMatured: true };
+    if (now <= start) return { pct: 0, daysRemaining: Math.ceil((end - start) / (1000 * 60 * 60 * 24)), isMatured: false };
+
+    const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    const elapsedDays = Math.ceil((now - start) / (1000 * 60 * 60 * 24));
+    const daysRemaining = Math.max(0, totalDays - elapsedDays);
+    const pct = Math.min(100, (elapsedDays / totalDays) * 100);
+
+    return { pct, daysRemaining, isMatured: false };
+  };
+
+  const activePassbooks = passbooks.filter(p => p.status !== 'Đã tất toán');
+  const totalActiveDeposit = activePassbooks.reduce((sum, p) => sum + (parseFloat(p.depositAmount) || 0), 0);
+  const totalProjectedInterest = activePassbooks.reduce((sum, p) => {
+    return sum + getProjectedInterest(p.depositAmount, p.interestRate, p.term);
+  }, 0);
+
+  const upcomingMaturityCount = activePassbooks.filter(p => {
+    const info = getProgressInfo(p.startDate, p.term);
+    return info.daysRemaining !== null && info.daysRemaining <= 30 && !info.isMatured;
+  }).length;
+
+  const handleSubmit = () => {
+    const depositAmount = parseFloat(form.depositAmount);
+    const interestRate = parseFloat(form.interestRate);
+    if (!form.bankName || isNaN(depositAmount) || isNaN(interestRate)) return;
+
+    const entry = {
+      ...form,
+      depositAmount,
+      interestRate,
+      id: editId || genId()
+    };
+
+    let updated;
+    if (editId) {
+      updated = passbooks.map(p => p.id === editId ? entry : p);
+    } else {
+      updated = [...passbooks, entry];
+    }
+
+    setPassbooks(updated);
+    savePassbooks(uid, updated);
+    setShowForm(false);
+    setEditId(null);
+    setForm(DEFAULT_FORM);
+  };
+
+  const handleEdit = (p) => {
+    setForm({
+      bankName: p.bankName,
+      depositAmount: p.depositAmount.toString(),
+      interestRate: p.interestRate.toString(),
+      term: p.term,
+      startDate: p.startDate,
+      maturityMethod: p.maturityMethod,
+      note: p.note || '',
+      status: p.status || 'Đang gửi'
+    });
+    setEditId(p.id);
+    setShowForm(true);
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa sổ tiết kiệm này?")) {
+      const updated = passbooks.filter(p => p.id !== id);
+      setPassbooks(updated);
+      savePassbooks(uid, updated);
+    }
+  };
+
+  const handleWithdrawClick = (p) => {
+    setWithdrawId(p.id);
+    const projInterest = getProjectedInterest(p.depositAmount, p.interestRate, p.term);
+    const info = getProgressInfo(p.startDate, p.term);
+    if (info.isMatured) {
+      setActualInterestInput(projInterest.toFixed(0));
+    } else {
+      const start = new Date(p.startDate).getTime();
+      const now = new Date().getTime();
+      const elapsedDays = Math.max(0, Math.ceil((now - start) / (1000 * 60 * 60 * 24)));
+      const earlyInterest = p.depositAmount * (0.1 / 100) * (elapsedDays / 365);
+      setActualInterestInput(earlyInterest.toFixed(0));
+    }
+  };
+
+  const handleWithdrawSubmit = (id) => {
+    const actualInterest = parseFloat(actualInterestInput) || 0;
+    const updated = passbooks.map(p => {
+      if (p.id === id) {
+        return {
+          ...p,
+          status: 'Đã tất toán',
+          actualInterest,
+          withdrawalDate: new Date().toISOString().split('T')[0]
+        };
+      }
+      return p;
+    });
+
+    setPassbooks(updated);
+    savePassbooks(uid, updated);
+    setWithdrawId(null);
+    setActualInterestInput('');
+  };
+
+  return (
+    <div className="finance-tab-content">
+      <div className="finance-summary-row">
+        <div className="finance-card income-card" style={{ borderLeftColor: '#10b981' }}>
+          <BookOpen size={20} style={{ color: '#10b981' }} />
+          <div>
+            <div className="finance-card-label">Tổng tiền gửi</div>
+            <div className="finance-card-value" style={{ color: '#10b981' }}>{formatVND(totalActiveDeposit)}</div>
+          </div>
+        </div>
+        <div className="finance-card balance-card positive" style={{ borderLeftColor: '#3b82f6' }}>
+          <TrendingUp size={20} style={{ color: '#3b82f6' }} />
+          <div>
+            <div className="finance-card-label">Lãi dự kiến</div>
+            <div className="finance-card-value" style={{ color: '#3b82f6' }}>{formatVND(totalProjectedInterest)}</div>
+          </div>
+        </div>
+        <div className="finance-card expense-card" style={{ borderLeftColor: '#f59e0b' }}>
+          <Calendar size={20} style={{ color: '#f59e0b' }} />
+          <div>
+            <div className="finance-card-label">Sắp đáo hạn (&lt;30 ngày)</div>
+            <div className="finance-card-value" style={{ color: '#f59e0b' }}>{upcomingMaturityCount} sổ</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="finance-toolbar">
+        <div></div>
+        <button className="btn-add" onClick={() => { setShowForm(!showForm); setEditId(null); setForm(DEFAULT_FORM); }}>
+          <Plus size={16} /> Thêm sổ tiết kiệm
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="finance-form">
+          <div style={{ fontWeight: 700, marginBottom: '0.25rem', fontSize: '0.95rem' }}>
+            {editId ? "Cập nhật sổ tiết kiệm" : "Mở sổ tiết kiệm mới"}
+          </div>
+          <div className="finance-form-row">
+            <div style={{ flex: 2 }}>
+              <span className="form-label">Tên ngân hàng / Sổ</span>
+              <input type="text" className="input-field" placeholder="VD: Vietcombank, BIDV..." value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} />
+            </div>
+            <div style={{ flex: 2 }}>
+              <span className="form-label">Số tiền gửi (VNĐ)</span>
+              <input type="number" className="input-field" placeholder="Số tiền gửi" value={form.depositAmount} onChange={e => setForm({ ...form, depositAmount: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="finance-form-row">
+            <div style={{ flex: 1 }}>
+              <span className="form-label">Kỳ hạn</span>
+              <select className="finance-select" style={{ width: '100%' }} value={form.term} onChange={e => setForm({ ...form, term: e.target.value })}>
+                {TERMS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <span className="form-label">Lãi suất (% / năm)</span>
+              <input type="number" step="0.01" className="input-field" placeholder="Lãi suất" value={form.interestRate} onChange={e => setForm({ ...form, interestRate: e.target.value })} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <span className="form-label">Ngày gửi</span>
+              <input type="date" className="input-field" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="finance-form-row">
+            <div style={{ flex: 2 }}>
+              <span className="form-label">Phương thức đáo hạn</span>
+              <select className="finance-select" style={{ width: '100%' }} value={form.maturityMethod} onChange={e => setForm({ ...form, maturityMethod: e.target.value })}>
+                {MATURITY_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 2 }}>
+              <span className="form-label">Ghi chú</span>
+              <input type="text" className="input-field" placeholder="VD: Gửi mua nhà, tích lũy..." value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="finance-form-actions">
+            <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> {editId ? "Lưu thay đổi" : "Mở sổ"}</button>
+            <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
+          </div>
+        </div>
+      )}
+
+      <div className="savings-grid">
+        {passbooks.length === 0 ? (
+          <div className="empty-state" style={{ gridColumn: '1/-1' }}>Hãy mở sổ tiết kiệm đầu tiên! 💼🏦</div>
+        ) : (
+          passbooks.map(p => {
+            const isWithdrawn = p.status === 'Đã tất toán';
+            const projInterest = getProjectedInterest(p.depositAmount, p.interestRate, p.term);
+            const info = getProgressInfo(p.startDate, p.term);
+            const matDate = getMaturityDate(p.startDate, p.term);
+            const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : 'Không kỳ hạn';
+
+            return (
+              <React.Fragment key={p.id}>
+                <div className={`savings-card ${isWithdrawn ? 'completed' : ''}`} style={{ alignItems: 'stretch', textAlign: 'left' }}>
+                  <div className="savings-header" style={{ marginBottom: '0.5rem' }}>
+                    <div className="savings-name" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <BookOpen size={16} color={isWithdrawn ? 'var(--text-secondary)' : '#10b981'} />
+                      {p.bankName}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      {!isWithdrawn && <button className="btn-edit" title="Sửa sổ" onClick={() => handleEdit(p)}><Edit3 size={14} /></button>}
+                      <button className="btn-delete" title="Xóa sổ" onClick={() => handleDelete(p.id)}><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                    <span className="debt-badge" style={{ 
+                      background: isWithdrawn ? 'rgba(255,255,255,0.05)' : info.isMatured ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                      color: isWithdrawn ? 'var(--text-secondary)' : info.isMatured ? 'var(--accent-green)' : '#3b82f6'
+                    }}>
+                      {isWithdrawn ? 'Đã tất toán' : info.isMatured ? 'Đã đến hạn 🔔' : 'Đang gửi'}
+                    </span>
+                    <span className="debt-badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                      Kỳ hạn: {p.term}
+                    </span>
+                    <span className="debt-badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                      Lãi suất: {p.interestRate}%/năm
+                    </span>
+                  </div>
+
+                  <div className="savings-amounts" style={{ marginBottom: '0.75rem' }}>
+                    <div>
+                      <span className="savings-label">Tiền gửi gốc:</span> 
+                      <strong style={{ float: 'right', color: 'var(--text-primary)' }}>{formatVND(p.depositAmount)}</strong>
+                    </div>
+                    {isWithdrawn ? (
+                      <>
+                        <div>
+                          <span className="savings-label">Lãi thực nhận:</span> 
+                          <strong style={{ float: 'right', color: '#10b981' }}>{formatVND(p.actualInterest || 0)}</strong>
+                        </div>
+                        <div>
+                          <span className="savings-label">Tổng nhận:</span> 
+                          <strong style={{ float: 'right', color: '#10b981' }}>{formatVND(p.depositAmount + (p.actualInterest || 0))}</strong>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <span className="savings-label">Lãi dự kiến:</span> 
+                          <strong style={{ float: 'right', color: '#3b82f6' }}>{formatVND(projInterest)}</strong>
+                        </div>
+                        <div>
+                          <span className="savings-label">Tổng nhận khi đáo hạn:</span> 
+                          <strong style={{ float: 'right', color: '#10b981' }}>{formatVND(p.depositAmount + projInterest)}</strong>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.2rem', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.375rem', marginBottom: '0.75rem' }}>
+                    <div><strong>Ngày gửi:</strong> {fmtDate(p.startDate)}</div>
+                    <div><strong>Ngày đáo hạn:</strong> {fmtDate(matDate)}</div>
+                    {isWithdrawn && p.withdrawalDate && (
+                      <div><strong>Ngày tất toán:</strong> {fmtDate(p.withdrawalDate)}</div>
+                    )}
+                    {!isWithdrawn && p.term !== 'Không kỳ hạn' && (
+                      <div><strong>Đáo hạn:</strong> {p.maturityMethod}</div>
+                    )}
+                    {p.note && <div><strong>Ghi chú:</strong> {p.note}</div>}
+                  </div>
+
+                  {!isWithdrawn && (
+                    <div style={{ marginTop: 'auto' }}>
+                      {p.term !== 'Không kỳ hạn' && (
+                        <div style={{ marginBottom: '0.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
+                            <span>Tiến trình gửi</span>
+                            <span>{info.pct.toFixed(0)}%</span>
+                          </div>
+                          <div className="debt-progress-bar">
+                            <div className="debt-progress-fill" style={{ width: `${info.pct}%`, background: info.pct === 100 ? 'var(--accent-green)' : '#3b82f6' }} />
+                          </div>
+                          {info.daysRemaining !== null && info.daysRemaining > 0 && (
+                            <div style={{ fontSize: '0.7rem', color: '#f59e0b', marginTop: '0.2rem', textAlign: 'right' }}>
+                              Còn {info.daysRemaining} ngày nữa đáo hạn
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {withdrawId !== p.id ? (
+                        <button className="savings-deposit-btn" style={{ borderColor: '#10b981', color: '#10b981', background: 'rgba(16, 185, 129, 0.05)' }} onClick={() => handleWithdrawClick(p)}>
+                          <Check size={14} /> Tất toán sổ
+                        </button>
+                      ) : (
+                        <div className="finance-form inline-edit" style={{ padding: '0.75rem', marginTop: '0.5rem' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                            {info.isMatured ? "Tất toán đúng hạn" : "Tất toán trước hạn (Lãi giảm)"}
+                          </div>
+                          <span className="form-label" style={{ fontSize: '0.65rem' }}>Tiền lãi nhận thực tế (VNĐ):</span>
+                          <input type="number" className="input-field" style={{ padding: '0.35rem' }} value={actualInterestInput} onChange={e => setActualInterestInput(e.target.value)} />
+                          <div className="finance-form-actions" style={{ marginTop: '0.5rem' }}>
+                            <button className="btn-submit small" onClick={() => handleWithdrawSubmit(p.id)}><Check size={12} /> Xác nhận</button>
+                            <button className="btn-cancel small" onClick={() => setWithdrawId(null)}><X size={12} /> Hủy</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {isWithdrawn && (
+                    <div className="savings-completed-badge" style={{ marginTop: 'auto', textAlign: 'center', fontSize: '0.85rem' }}>
+                      🏦 Đã tất toán tài khoản
+                    </div>
+                  )}
+                </div>
+              </React.Fragment>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ==================== MAIN COMPONENT ====================
 export default function FinanceDashboard({ uid }) {
   const [activeTab, setActiveTab] = useState('transactions');
   const [transactions, setTransactions] = useState([]);
   const [debts, setDebts] = useState([]);
   const [savings, setSavings] = useState([]);
+  const [passbooks, setPassbooks] = useState([]);
 
   useEffect(() => {
     if (!uid) return;
     const unsub1 = subscribeTransactions(uid, setTransactions);
     const unsub2 = subscribeDebts(uid, setDebts);
     const unsub3 = subscribeSavings(uid, setSavings);
-    return () => { unsub1(); unsub2(); unsub3(); };
+    const unsub4 = subscribePassbooks(uid, setPassbooks);
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
   }, [uid]);
 
   return (
@@ -870,7 +1299,10 @@ export default function FinanceDashboard({ uid }) {
           <CreditCard size={16} /> Quản Lý Nợ
         </button>
         <button className={`finance-tab-btn ${activeTab === 'savings' ? 'active' : ''}`} onClick={() => setActiveTab('savings')}>
-          <PiggyBank size={16} /> Tiết Kiệm
+          <PiggyBank size={16} /> Mục Tiêu Tiết Kiệm
+        </button>
+        <button className={`finance-tab-btn ${activeTab === 'passbooks' ? 'active' : ''}`} onClick={() => setActiveTab('passbooks')}>
+          <BookOpen size={16} /> Sổ Tiết Kiệm
         </button>
       </div>
 
@@ -878,6 +1310,7 @@ export default function FinanceDashboard({ uid }) {
       {activeTab === 'transactions' && <TransactionsTab transactions={transactions} setTransactions={setTransactions} uid={uid} />}
       {activeTab === 'debts' && <DebtsTab debts={debts} setDebts={setDebts} uid={uid} />}
       {activeTab === 'savings' && <SavingsTab savings={savings} setSavings={setSavings} uid={uid} />}
+      {activeTab === 'passbooks' && <PassbooksTab passbooks={passbooks} setPassbooks={setPassbooks} uid={uid} />}
     </div>
   );
 }

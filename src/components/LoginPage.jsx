@@ -37,7 +37,7 @@ export default function LoginPage() {
           <div className="login-logo-icon">
             <Activity size={32} color="#10b981" />
           </div>
-          <h1 className="login-title">Finance Dashboard</h1>
+          <h1 className="login-title">My Finance</h1>
           <p className="login-subtitle">Quản lý tài chính cá nhân thông minh</p>
         </div>
 

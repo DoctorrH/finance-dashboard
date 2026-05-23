@@ -6,10 +6,11 @@ import {
   subscribeSavings, 
   subscribeGoldHoldings,
   saveAssetHistory,
-  subscribeAssetHistory
+  subscribeAssetHistory,
+  subscribePassbooks
 } from '../firebase';
 import { fetchDomesticGold } from '../utils/goldApi';
-import { Wallet, TrendingUp, CreditCard, PiggyBank, Target, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
+import { Wallet, TrendingUp, CreditCard, PiggyBank, Target, Activity } from 'lucide-react';
 
 function formatVND(num) {
   if (!num) return '0 ₫';
@@ -22,6 +23,7 @@ export default function OverviewDashboard({ stockData, uid }) {
   const [transactions, setTransactions] = useState([]);
   const [debts, setDebts] = useState([]);
   const [savings, setSavings] = useState([]);
+  const [passbooks, setPassbooks] = useState([]);
   const [domesticGold, setDomesticGold] = useState([]);
   const [assetHistory, setAssetHistory] = useState(null);
 
@@ -33,6 +35,7 @@ export default function OverviewDashboard({ stockData, uid }) {
     const unsubTrans = subscribeTransactions(uid, setTransactions);
     const unsubDebts = subscribeDebts(uid, setDebts);
     const unsubSavings = subscribeSavings(uid, setSavings);
+    const unsubPassbooks = subscribePassbooks(uid, setPassbooks);
     const unsubHistory = subscribeAssetHistory(uid, setAssetHistory);
 
     const loadGold = () => fetchDomesticGold().then(setDomesticGold).catch(console.error);
@@ -47,6 +50,7 @@ export default function OverviewDashboard({ stockData, uid }) {
       unsubTrans();
       unsubDebts();
       unsubSavings();
+      unsubPassbooks();
       unsubHistory();
       clearInterval(goldTimer);
     };
@@ -72,7 +76,8 @@ export default function OverviewDashboard({ stockData, uid }) {
   };
   const totalGoldValue = goldHoldings.reduce((sum, h) => sum + (getGoldPrice(h.type, h.unit) * h.weight), 0);
 
-  const totalSavings = savings.reduce((sum, s) => sum + s.currentAmount, 0);
+  const totalSavings = savings.reduce((sum, s) => sum + s.currentAmount, 0) + 
+    passbooks.filter(p => p.status !== 'Đã tất toán').reduce((sum, p) => sum + (parseFloat(p.depositAmount) || 0), 0);
   const totalAssets = totalStockValue + totalGoldValue + totalSavings;
 
   // --- 2. Tính Tổng Nợ ---
@@ -187,7 +192,6 @@ export default function OverviewDashboard({ stockData, uid }) {
                 const total = totalAssets || 1;
                 const pStock = (totalStockValue / total) * 100;
                 const pGold = (totalGoldValue / total) * 100;
-                const pSavings = (totalSavings / total) * 100;
                 const r = 40;
                 const circ = 2 * Math.PI * r;
                 return (
@@ -312,7 +316,7 @@ export default function OverviewDashboard({ stockData, uid }) {
                 // Lấy 12 bản ghi gần nhất
                 const recentData = assetChartData.slice(-12);
                 
-                return recentData.map((h, i) => {
+                return recentData.map((h) => {
                   const height = Math.max((h.value / maxVal) * 100, 2);
                   const date = new Date(h.time);
                   const label = `${date.getMonth() + 1}/${date.getFullYear().toString().slice(2)}`;
