@@ -156,19 +156,85 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
 
   return (
     <div className="finance-tab-content">
-      {/* Summary Cards */}
-      <div className="finance-summary-row">
+      {/* Master Cash Balance Card - Tiền Đang Có */}
+      <div 
+        className="finance-card" 
+        style={{ 
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(99, 102, 241, 0.06) 100%)', 
+          border: '1px solid rgba(139, 92, 246, 0.25)', 
+          borderRadius: '1rem', 
+          padding: '1.25rem 1.5rem', 
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          boxShadow: '0 8px 32px 0 rgba(139, 92, 246, 0.05)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{ background: 'rgba(139, 92, 246, 0.12)', padding: '0.75rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a78bfa' }}>
+            <Wallet size={28} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+              Tổng Tiền Đang Có (Khả Dụng)
+            </div>
+            {isEditingCash ? (
+              <form onSubmit={handleSaveCash} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <input
+                  type="number"
+                  value={cashInput}
+                  onChange={(e) => setCashInput(e.target.value)}
+                  className="input-field"
+                  placeholder="Nhập số tiền..."
+                  style={{ padding: '0.4rem 0.75rem', fontSize: '1.1rem', width: '200px', boxSizing: 'border-box', height: '36px', borderRadius: '6px' }}
+                  autoFocus
+                  min="0"
+                />
+                <button type="submit" className="btn-submit" style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', borderRadius: '6px', height: '36px', cursor: 'pointer' }}>Lưu</button>
+                <button type="button" onClick={() => setIsEditingCash(false)} style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', height: '36px', cursor: 'pointer' }}>Hủy</button>
+              </form>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{formatVND(cashOnHand)}</div>
+                <button
+                  onClick={() => {
+                    setCashInput(cashOnHand.toString());
+                    setIsEditingCash(true);
+                  }}
+                  title="Chỉnh sửa số tiền mặt đang có"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.4rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', width: '28px', height: '28px' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                >
+                  <Edit3 size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '320px', lineHeight: 1.4 }}>
+          💡 Đây là tổng ví tiền mặt nhàn rỗi của bạn, tự động cộng thêm khi thu nhập và trừ đi khi chi tiêu.
+        </div>
+      </div>
+
+      {/* Monthly Summary Flow Row (3 cards) */}
+      <div className="finance-summary-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
         <div className="finance-card income-card">
           <ArrowUpCircle size={20} />
           <div>
-            <div className="finance-card-label">Thu nhập</div>
+            <div className="finance-card-label">Thu nhập tháng này</div>
             <div className="finance-card-value">{formatVND(totalIncome)}</div>
           </div>
         </div>
         <div className="finance-card expense-card">
           <ArrowDownCircle size={20} />
           <div>
-            <div className="finance-card-label">Chi tiêu</div>
+            <div className="finance-card-label">Chi tiêu tháng này</div>
             <div className="finance-card-value">{formatVND(totalExpense)}</div>
           </div>
         </div>
@@ -177,51 +243,6 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
           <div>
             <div className="finance-card-label">Thặng dư tháng này</div>
             <div className="finance-card-value">{balance >= 0 ? '+' : ''}{formatVND(balance)}</div>
-          </div>
-        </div>
-        <div className="finance-card balance-card positive" style={{ borderLeftColor: '#8b5cf6', position: 'relative' }}>
-          <Wallet size={20} style={{ color: '#8b5cf6' }} />
-          <div>
-            <div className="finance-card-label">Tiền Đang Có</div>
-            {isEditingCash ? (
-              <form onSubmit={handleSaveCash} style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.25rem' }}>
-                <input
-                  type="number"
-                  value={cashInput}
-                  onChange={(e) => setCashInput(e.target.value)}
-                  className="input-field"
-                  placeholder="Nhập số tiền..."
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box', height: '32px' }}
-                  autoFocus
-                  min="0"
-                />
-                {cashInput && (
-                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 'bold' }}>
-                    {Number(cashInput).toLocaleString('vi-VN')} ₫
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button type="submit" className="btn-submit" style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', height: '24px', cursor: 'pointer' }}>Lưu</button>
-                  <button type="button" onClick={() => setIsEditingCash(false)} style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', height: '24px', cursor: 'pointer' }}>Hủy</button>
-                </div>
-              </form>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div className="finance-card-value">{formatVND(cashOnHand)}</div>
-                <button
-                  onClick={() => {
-                    setCashInput(cashOnHand.toString());
-                    setIsEditingCash(true);
-                  }}
-                  title="Chỉnh sửa số tiền mặt đang có"
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                >
-                  <Edit3 size={14} />
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
