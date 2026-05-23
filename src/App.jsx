@@ -7,6 +7,7 @@ import GoldDashboard from './components/GoldDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import OverviewDashboard from './components/OverviewDashboard';
 import LoginPage from './components/LoginPage';
+import LogoIcon from './components/LogoIcon';
 import { Activity, TrendingUp, TrendingDown, Loader2, Briefcase, BarChart2, Wallet, PieChart, LogOut } from 'lucide-react';
 import { savePortfolioToFirebase, savePurchasingPowerToFirebase, subscribeToPortfolio, onAuthChange, signOutUser, migrateOldData } from './firebase';
 
@@ -183,7 +184,7 @@ function Dashboard({ user }) {
       {/* Header */}
       <header className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Activity color={currentApp === 'stocks' ? "#10b981" : currentApp === 'gold' ? "#f59e0b" : currentApp === 'overview' ? "#8b5cf6" : "#3b82f6"} size={28} />
+          <LogoIcon size={30} />
           <h1>My Finance</h1>
         </div>
         

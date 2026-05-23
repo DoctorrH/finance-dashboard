@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithGoogle } from '../firebase';
-import { Activity, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import LogoIcon from './LogoIcon';
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -34,8 +35,8 @@ export default function LoginPage() {
 
       <div className="login-card">
         <div className="login-logo">
-          <div className="login-logo-icon">
-            <Activity size={32} color="#10b981" />
+          <div className="login-logo-icon" style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '0.6rem', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
+            <LogoIcon size={40} />
           </div>
           <h1 className="login-title">My Finance</h1>
           <p className="login-subtitle">Quản lý tài chính cá nhân thông minh</p>
