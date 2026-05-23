@@ -27,6 +27,18 @@ export default function GoldDashboard({ uid }) {
   const DEFAULT_FORM = { name: '', type: 'SJC', weight: '', unit: 'lượng', buyPrice: '', buyDate: new Date().toISOString().slice(0, 10) };
   const [form, setForm] = useState(DEFAULT_FORM);
 
+  const goldBreakdown = React.useMemo(() => {
+    const groups = {};
+    holdings.forEach(h => {
+      const key = `${h.type}_${h.unit}`;
+      if (!groups[key]) {
+        groups[key] = { type: h.type, unit: h.unit, weight: 0 };
+      }
+      groups[key].weight += parseFloat(h.weight) || 0;
+    });
+    return Object.values(groups);
+  }, [holdings]);
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -135,6 +147,7 @@ export default function GoldDashboard({ uid }) {
   const totalPL = totalCurrentValue - totalInvested;
   const totalPLPct = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
 
+
   return (
     <main className="main-content">
       {/* Sidebar */}
@@ -195,12 +208,27 @@ export default function GoldDashboard({ uid }) {
         ) : (
           <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, overflowY: 'auto' }}>
             {/* Holdings Summary */}
-            <div className="portfolio-summary" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(15,23,42,0.8))', borderColor: 'rgba(245,158,11,0.3)' }}>
+            <div className="portfolio-summary" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(15,23,42,0.8))', borderColor: 'rgba(245,158,11,0.3)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid' }}>
               <div className="summary-label">Tổng Giá Trị Nắm Giữ</div>
               <div className="summary-value">{formatVND(totalCurrentValue)}</div>
               <div className="summary-pl" style={{ color: totalPL >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                 {totalPL >= 0 ? '+' : ''}{formatVND(totalPL)} ({totalPLPct >= 0 ? '+' : ''}{totalPLPct.toFixed(2)}%)
               </div>
+
+              {/* Detailed Gold Quantity Breakdown */}
+              {goldBreakdown.length > 0 && (
+                <div style={{ marginTop: '1rem', borderTop: '1px dashed rgba(245,158,11,0.2)', paddingTop: '0.75rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem', fontWeight: 600 }}>Chi tiết số lượng nắm giữ:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 0.75rem' }}>
+                    {goldBreakdown.map(g => (
+                      <div key={`${g.type}_${g.unit}`} style={{ fontSize: '0.8rem', color: 'var(--text-primary)', background: 'rgba(245,158,11,0.06)', padding: '0.25rem 0.5rem', borderRadius: '0.375rem', border: '1px solid rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span style={{ fontWeight: 700, color: '#f59e0b' }}>{g.type}:</span>
+                        <span>{g.weight.toFixed(2)} {g.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Add button */}

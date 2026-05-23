@@ -8,7 +8,7 @@ import FinanceDashboard from './components/FinanceDashboard';
 import OverviewDashboard from './components/OverviewDashboard';
 import LoginPage from './components/LoginPage';
 import { Activity, TrendingUp, TrendingDown, Loader2, Briefcase, BarChart2, Wallet, PieChart, LogOut } from 'lucide-react';
-import { savePortfolioToFirebase, subscribeToPortfolio, onAuthChange, signOutUser, migrateOldData } from './firebase';
+import { savePortfolioToFirebase, savePurchasingPowerToFirebase, subscribeToPortfolio, onAuthChange, signOutUser, migrateOldData } from './firebase';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -81,13 +81,20 @@ function Dashboard({ user }) {
   
   const [activeTab, setActiveTab] = useState('market'); // 'market', 'portfolio'
   const [portfolio, setPortfolio] = useState([]);
+  const [purchasingPower, setPurchasingPower] = useState(0);
 
   useEffect(() => {
     const unsubscribe = subscribeToPortfolio(uid, (data) => {
-      setPortfolio(data);
+      setPortfolio(data.portfolio || []);
+      setPurchasingPower(data.purchasingPower || 0);
     });
     return () => unsubscribe();
   }, [uid]);
+
+  const handleUpdatePurchasingPower = (amount) => {
+    setPurchasingPower(amount);
+    savePurchasingPowerToFirebase(uid, amount);
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -269,6 +276,8 @@ function Dashboard({ user }) {
             ) : (
               <PortfolioManager 
                 portfolio={portfolio}
+                purchasingPower={purchasingPower}
+                onUpdatePurchasingPower={handleUpdatePurchasingPower}
                 stockData={stockData}
                 onAddHolding={handleAddHolding}
                 onRemoveHolding={handleRemoveHolding}

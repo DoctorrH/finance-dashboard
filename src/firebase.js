@@ -34,12 +34,24 @@ export const savePortfolioToFirebase = async (uid, portfolioData) => {
   }
 };
 
+export const savePurchasingPowerToFirebase = async (uid, purchasingPower) => {
+  try {
+    await setDoc(userDoc(uid, 'portfolio'), { purchasingPower }, { merge: true });
+  } catch (err) {
+    console.error("Error saving purchasing power: ", err);
+  }
+};
+
 export const subscribeToPortfolio = (uid, callback) => {
   return onSnapshot(userDoc(uid, 'portfolio'), (docSnap) => {
     if (docSnap.exists()) {
-      callback(docSnap.data().portfolio || []);
+      const data = docSnap.data();
+      callback({
+        portfolio: data.portfolio || [],
+        purchasingPower: data.purchasingPower || 0
+      });
     } else {
-      callback([]);
+      callback({ portfolio: [], purchasingPower: 0 });
     }
   });
 };

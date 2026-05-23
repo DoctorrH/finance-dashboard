@@ -1,12 +1,27 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 
-export default function PortfolioManager({ portfolio, stockData, onAddHolding, onRemoveHolding, onSelectTicker, selectedTicker }) {
+export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpdatePurchasingPower, stockData, onAddHolding, onRemoveHolding, onSelectTicker, selectedTicker }) {
   const [isAdding, setIsAdding] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [symbol, setSymbol] = useState('');
   const [buyPrice, setBuyPrice] = useState('');
   const [volume, setVolume] = useState('');
+
+  // Sức mua cash state
+  const [isEditingCash, setIsEditingCash] = useState(false);
+  const [cashInput, setCashInput] = useState('');
+
+  const handleSaveCash = (e) => {
+    e.preventDefault();
+    const amount = Number(cashInput);
+    if (isNaN(amount) || amount < 0) {
+      alert('Vui lòng nhập số tiền mặt hợp lệ.');
+      return;
+    }
+    onUpdatePurchasingPower(amount);
+    setIsEditingCash(false);
+  };
 
   const handleAdd = (e) => {
     e.preventDefault();
@@ -83,11 +98,68 @@ export default function PortfolioManager({ portfolio, stockData, onAddHolding, o
 
   return (
     <div className="portfolio-manager">
-      <div className="portfolio-summary">
-        <div className="summary-label">Tổng Tài Sản</div>
-        <div className="summary-value">{(totalValue * 1000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ₫</div>
-        <div className={`summary-pl ${totalPl >= 0 ? 'up' : 'down'}`}>
-          {totalPl >= 0 ? '+' : ''}{(totalPl * 1000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ₫ ({totalPlPercent.toFixed(2)}%)
+      <div className="portfolio-summary" style={{ padding: '1rem', textAlign: 'left' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
+          <div>
+            <div className="summary-label" style={{ marginBottom: '0.25rem' }}>Cổ Phiếu</div>
+            <div className="summary-value" style={{ fontSize: '1.2rem', marginBottom: '0.1rem' }}>
+              {(totalValue * 1000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ₫
+            </div>
+            <div className={`summary-pl ${totalPl >= 0 ? 'up' : 'down'}`} style={{ fontSize: '0.75rem' }}>
+              {totalPl >= 0 ? '+' : ''}{(totalPl * 1000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ₫ ({totalPlPercent.toFixed(2)}%)
+            </div>
+          </div>
+          <div style={{ borderLeft: '1px solid rgba(255,255,255,0.08)', paddingLeft: '0.75rem' }}>
+            <div className="summary-label" style={{ marginBottom: '0.25rem' }}>Sức Mua (Tiền Mặt)</div>
+            {isEditingCash ? (
+              <form onSubmit={handleSaveCash} style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.25rem' }}>
+                <input
+                  type="number"
+                  value={cashInput}
+                  onChange={(e) => setCashInput(e.target.value)}
+                  className="input-field"
+                  placeholder="Tiền mặt (₫)"
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box', height: '32px' }}
+                  autoFocus
+                  min="0"
+                />
+                {cashInput && (
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', textAlign: 'right', fontWeight: 'bold' }}>
+                    {Number(cashInput).toLocaleString('vi-VN')} ₫
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                  <button type="submit" className="btn-submit" style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', height: '24px', cursor: 'pointer' }}>Lưu</button>
+                  <button type="button" onClick={() => setIsEditingCash(false)} style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '4px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', height: '24px', cursor: 'pointer' }}>Hủy</button>
+                </div>
+              </form>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <span className="summary-value" style={{ fontSize: '1.2rem', marginBottom: 0 }}>
+                  {purchasingPower.toLocaleString('vi-VN')} ₫
+                </span>
+                <button
+                  onClick={() => {
+                    setCashInput(purchasingPower.toString());
+                    setIsEditingCash(true);
+                  }}
+                  title="Chỉnh sửa sức mua"
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div style={{ textAlign: 'center' }}>
+          <div className="summary-label" style={{ marginBottom: '0.1rem', fontSize: '0.7rem' }}>Tổng Giá Trị Tài Khoản</div>
+          <div className="summary-value" style={{ fontSize: '1.6rem', color: 'var(--accent-green)', marginBottom: 0 }}>
+            {((totalValue * 1000) + purchasingPower).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ₫
+          </div>
         </div>
       </div>
 

@@ -19,6 +19,7 @@ function formatVND(num) {
 
 export default function OverviewDashboard({ stockData, uid }) {
   const [portfolio, setPortfolio] = useState([]);
+  const [purchasingPower, setPurchasingPower] = useState(0);
   const [goldHoldings, setGoldHoldings] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [debts, setDebts] = useState([]);
@@ -30,7 +31,10 @@ export default function OverviewDashboard({ stockData, uid }) {
   useEffect(() => {
     if (!uid) return;
     // Subscriptions
-    const unsubPortfolio = subscribeToPortfolio(uid, setPortfolio);
+    const unsubPortfolio = subscribeToPortfolio(uid, (data) => {
+      setPortfolio(data.portfolio || []);
+      setPurchasingPower(data.purchasingPower || 0);
+    });
     const unsubGold = subscribeGoldHoldings(uid, setGoldHoldings);
     const unsubTrans = subscribeTransactions(uid, setTransactions);
     const unsubDebts = subscribeDebts(uid, setDebts);
@@ -63,6 +67,8 @@ export default function OverviewDashboard({ stockData, uid }) {
     return sum + (live ? live.price * item.volume * 1000 : 0); // Multiply by 1000 for VND
   }, 0);
 
+  const totalStockAccountValue = totalStockValue + purchasingPower;
+
   // Gold value
   const getGoldPrice = (type, unit) => {
     if (!domesticGold.length) return 0;
@@ -78,7 +84,7 @@ export default function OverviewDashboard({ stockData, uid }) {
 
   const totalSavings = savings.reduce((sum, s) => sum + s.currentAmount, 0) + 
     passbooks.filter(p => p.status !== 'Đã tất toán').reduce((sum, p) => sum + (parseFloat(p.depositAmount) || 0), 0);
-  const totalAssets = totalStockValue + totalGoldValue + totalSavings;
+  const totalAssets = totalStockAccountValue + totalGoldValue + totalSavings;
 
   // --- 2. Tính Tổng Nợ ---
   const totalDebt = debts.reduce((sum, d) => sum + (d.principalAmount - d.principalPaid), 0);
@@ -190,7 +196,7 @@ export default function OverviewDashboard({ stockData, uid }) {
             <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
               {(() => {
                 const total = totalAssets || 1;
-                const pStock = (totalStockValue / total) * 100;
+                const pStock = (totalStockAccountValue / total) * 100;
                 const pGold = (totalGoldValue / total) * 100;
                 const r = 40;
                 const circ = 2 * Math.PI * r;
@@ -218,8 +224,8 @@ export default function OverviewDashboard({ stockData, uid }) {
                 <span style={{ fontWeight: 600 }}>Chứng Khoán</span>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 800 }}>{formatVND(totalStockValue)}</div>
-                <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>{totalAssets > 0 ? ((totalStockValue/totalAssets)*100).toFixed(1) : 0}%</div>
+                <div style={{ fontWeight: 800 }}>{formatVND(totalStockAccountValue)}</div>
+                <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>{totalAssets > 0 ? ((totalStockAccountValue/totalAssets)*100).toFixed(1) : 0}%</div>
               </div>
             </div>
             <div className="asset-item" style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
