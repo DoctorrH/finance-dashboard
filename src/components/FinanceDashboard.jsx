@@ -105,8 +105,21 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
     return d.getMonth() === filterMonth && d.getFullYear() === filterYear;
   }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const totalIncome = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const totalExpense = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const isSystemTransaction = (t) => {
+    if (t.isSystem) return true;
+    const systemCategories = ['Tiết kiệm', 'Đầu tư', 'Trả nợ', 'Giải ngân'];
+    if (systemCategories.includes(t.category) && t.note) {
+      const prefixes = ['Nạp tiền', 'Rút tiền', 'Hủy mục tiêu', 'Trả nợ', 'Vay thêm', 'Tất toán', 'Mở sổ', 'Mua vàng', 'Bán vàng', 'Mua cổ phiếu', 'Bán cổ phiếu'];
+      if (prefixes.some(prefix => t.note.startsWith(prefix))) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const manualFiltered = filtered.filter(t => !isSystemTransaction(t));
+  const totalIncome = manualFiltered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalExpense = manualFiltered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const balance = totalIncome - totalExpense;
 
   const handleSubmit = () => {

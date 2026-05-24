@@ -94,8 +94,21 @@ export default function OverviewDashboard({ stockData, uid }) {
   const totalDebt = debts.reduce((sum, d) => sum + (d.principalAmount - d.principalPaid), 0);
 
   // --- 4. Chi Tiêu Tháng Này ---
+  const isSystemTransaction = (t) => {
+    if (t.isSystem) return true;
+    const systemCategories = ['Tiết kiệm', 'Đầu tư', 'Trả nợ', 'Giải ngân'];
+    if (systemCategories.includes(t.category) && t.note) {
+      const prefixes = ['Nạp tiền', 'Rút tiền', 'Hủy mục tiêu', 'Trả nợ', 'Vay thêm', 'Tất toán', 'Mở sổ', 'Mua vàng', 'Bán vàng', 'Mua cổ phiếu', 'Bán cổ phiếu'];
+      if (prefixes.some(prefix => t.note.startsWith(prefix))) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const manualTransactions = transactions.filter(t => !isSystemTransaction(t));
+
   const now = new Date();
-  const currentMonthTransactions = transactions.filter(t => {
+  const currentMonthTransactions = manualTransactions.filter(t => {
     const d = new Date(t.date);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
@@ -118,7 +131,7 @@ export default function OverviewDashboard({ stockData, uid }) {
       });
     }
 
-    transactions.forEach(t => {
+    manualTransactions.forEach(t => {
       const d = new Date(t.date);
       const m = d.getMonth();
       const y = d.getFullYear();
