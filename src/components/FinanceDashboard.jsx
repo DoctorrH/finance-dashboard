@@ -536,6 +536,20 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
       updated = debts.map(d => d.id === editId ? entry : d);
     } else {
       updated = [...debts, entry];
+      
+      onUpdateCashOnHand(cashOnHand + principalAmount);
+      const newTransaction = {
+        id: genId(),
+        type: 'income',
+        amount: principalAmount,
+        category: 'Giải ngân',
+        note: `Vay nợ mới: ${form.name}`,
+        date: new Date().toISOString().split('T')[0],
+        isSystem: true
+      };
+      const updatedTransactions = [...transactions, newTransaction];
+      setTransactions(updatedTransactions);
+      saveTransactions(uid, updatedTransactions);
     }
     setDebts(updated);
     saveDebts(uid, updated);
