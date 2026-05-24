@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Pencil, Wallet } from 'lucide-react';
+import { subscribeTransactions, saveTransactions } from '../firebase';
 
-export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpdatePurchasingPower, stockData, onAddHolding, onRemoveHolding, onSelectTicker, selectedTicker }) {
+export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpdatePurchasingPower, cashOnHand = 0, onUpdateCashOnHand, stockData, onAddHolding, onRemoveHolding, onSelectTicker, selectedTicker, uid }) {
   const [isAdding, setIsAdding] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [symbol, setSymbol] = useState('');
@@ -11,6 +12,21 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
   // Sức mua cash state
   const [isEditingCash, setIsEditingCash] = useState(false);
   const [cashInput, setCashInput] = useState('');
+
+  // Sức mua topup states
+  const [isShowingTopup, setIsShowingTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState('');
+  const [transactions, setTransactions] = useState([]);
+
+  useEffect(() => {
+    if (!uid) return;
+    const unsub = subscribeTransactions(uid, setTransactions);
+    return () => unsub();
+  }, [uid]);
+
+  const genId = () => {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  };
 
   const handleSaveCash = (e) => {
     e.preventDefault();
@@ -23,8 +39,42 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
     setIsEditingCash(false);
   };
 
-  const handleAdd = (e) => {
+  const handleTopupSubmit = (e) => {
     e.preventDefault();
+    const amount = Number(topupAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Vui lòng nhập số tiền hợp lệ.');
+      return;
+    }
+
+    if (cashOnHand < amount) {
+      alert(`Số dư Tiền Nhàn Rỗi không đủ để chuyển vào Sức Mua.\n(Hiện tại: ${cashOnHand.toLocaleString('vi-VN')} ₫, Cần nạp: ${amount.toLocaleString('vi-VN')} ₫)`);
+      return;
+    }
+
+    // Trừ Tiền Nhàn Rỗi, cộng vào Sức Mua
+    onUpdateCashOnHand(cashOnHand - amount);
+    onUpdatePurchasingPower(purchasingPower + amount);
+
+    // Tự sinh giao dịch Chi tiêu
+    const newTransaction = {
+      id: genId(),
+      type: 'expense',
+      amount: amount,
+      category: 'Đầu tư',
+      note: `Nạp tiền vào tài khoản chứng khoán (Bổ sung Sức mua)`,
+      date: new Date().toISOString().split('T')[0]
+    };
+    const updatedTransactions = [...transactions, newTransaction];
+    setTransactions(updatedTransactions);
+    saveTransactions(uid, updatedTransactions);
+
+    setIsShowingTopup(false);
+    setTopupAmount('');
+  };
+
+  const handleAdd = (e, shouldDeduct = false) => {
+    if (e) e.preventDefault();
     if (!symbol || !buyPrice || !volume) return;
     
     const exists = stockData.find(s => s.symbol.toUpperCase() === symbol.toUpperCase());
@@ -33,10 +83,22 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
       return;
     }
 
+    const priceVal = Number(buyPrice);
+    const volumeVal = Number(volume);
+
+    if (shouldDeduct) {
+      const cost = priceVal * volumeVal * 1000;
+      if (purchasingPower < cost) {
+        alert(`Số dư Sức Mua không đủ để mua cổ phiếu này.\n(Sức mua hiện tại: ${purchasingPower.toLocaleString('vi-VN')} ₫, Chi phí mua: ${cost.toLocaleString('vi-VN')} ₫)`);
+        return;
+      }
+      onUpdatePurchasingPower(purchasingPower - cost);
+    }
+
     onAddHolding({
       symbol: symbol.toUpperCase(),
-      buyPrice: Number(buyPrice),
-      volume: Number(volume)
+      buyPrice: priceVal,
+      volume: volumeVal
     }, isEditMode);
 
     resetForm();
@@ -150,7 +212,39 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
                 >
                   <Pencil size={14} />
                 </button>
+                <button
+                  onClick={() => setIsShowingTopup(!isShowingTopup)}
+                  style={{ marginTop: '0.5rem', background: 'rgba(139, 92, 246, 0.15)', border: '1px solid rgba(139, 92, 246, 0.25)', color: '#c084fc', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}
+                >
+                  <Plus size={10} /> Bổ sung
+                </button>
               </div>
+            )}
+
+            {isShowingTopup && (
+              <form onSubmit={handleTopupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Nguồn: Tiền nhàn rỗi ({cashOnHand.toLocaleString('vi-VN')} ₫)</div>
+                <input
+                  type="number"
+                  value={topupAmount}
+                  onChange={(e) => setTopupAmount(e.target.value)}
+                  className="input-field"
+                  placeholder="Nhập số tiền (₫)"
+                  style={{ padding: '2px 6px', fontSize: '0.8rem', height: '28px', boxSizing: 'border-box' }}
+                  min="1"
+                  required
+                  autoFocus
+                />
+                {topupAmount && (
+                  <div style={{ fontSize: '0.65rem', color: 'var(--accent-green)', fontWeight: 'bold' }}>
+                    {Number(topupAmount).toLocaleString('vi-VN')} ₫
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', marginTop: '2px' }}>
+                  <button type="submit" className="btn-submit" style={{ padding: '2px 8px', fontSize: '0.7rem', height: '22px', cursor: 'pointer' }}>Nạp</button>
+                  <button type="button" className="btn-cancel" onClick={() => { setIsShowingTopup(false); setTopupAmount(''); }} style={{ padding: '2px 8px', fontSize: '0.7rem', height: '22px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>Hủy</button>
+                </div>
+              </form>
             )}
           </div>
         </div>
@@ -198,9 +292,23 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
             required
             className="input-field"
           />
-          <button type="submit" className="btn-submit">
-            Lưu
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', width: '100%', flexWrap: 'wrap' }}>
+            <button 
+              type="button" 
+              className="btn-submit" 
+              style={{ flex: 1, minWidth: '130px', background: 'var(--buy-color)', cursor: 'pointer' }}
+              onClick={(e) => handleAdd(e, true)}
+            >
+              Mua (Trừ Sức Mua)
+            </button>
+            <button 
+              type="button" 
+              style={{ flex: 1, minWidth: '130px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+              onClick={(e) => handleAdd(e, false)}
+            >
+              Thêm (Không trừ tiền)
+            </button>
+          </div>
         </form>
       )}
 

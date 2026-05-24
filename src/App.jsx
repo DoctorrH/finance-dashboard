@@ -9,7 +9,7 @@ import OverviewDashboard from './components/OverviewDashboard';
 import LoginPage from './components/LoginPage';
 import LogoIcon from './components/LogoIcon';
 import { Activity, TrendingUp, TrendingDown, Loader2, Briefcase, BarChart2, Wallet, PieChart, LogOut } from 'lucide-react';
-import { savePortfolioToFirebase, savePurchasingPowerToFirebase, subscribeToPortfolio, onAuthChange, signOutUser, migrateOldData } from './firebase';
+import { savePortfolioToFirebase, savePurchasingPowerToFirebase, subscribeToPortfolio, onAuthChange, signOutUser, migrateOldData, saveCashOnHand, subscribeCashOnHand } from './firebase';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -95,6 +95,18 @@ function Dashboard({ user }) {
   const handleUpdatePurchasingPower = (amount) => {
     setPurchasingPower(amount);
     savePurchasingPowerToFirebase(uid, amount);
+  };
+
+  const [cashOnHand, setCashOnHand] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = subscribeCashOnHand(uid, setCashOnHand);
+    return () => unsubscribe();
+  }, [uid]);
+
+  const handleUpdateCashOnHand = (amount) => {
+    setCashOnHand(amount);
+    saveCashOnHand(uid, amount);
   };
 
   useEffect(() => {
@@ -248,7 +260,7 @@ function Dashboard({ user }) {
       ) : currentApp === 'finance' ? (
         <FinanceDashboard uid={uid} />
       ) : currentApp === 'gold' ? (
-        <GoldDashboard uid={uid} />
+        <GoldDashboard uid={uid} cashOnHand={cashOnHand} onUpdateCashOnHand={handleUpdateCashOnHand} />
       ) : (
         /* Stock Market Main Content */
         <main className="main-content">
@@ -279,11 +291,14 @@ function Dashboard({ user }) {
                 portfolio={portfolio}
                 purchasingPower={purchasingPower}
                 onUpdatePurchasingPower={handleUpdatePurchasingPower}
+                cashOnHand={cashOnHand}
+                onUpdateCashOnHand={handleUpdateCashOnHand}
                 stockData={stockData}
                 onAddHolding={handleAddHolding}
                 onRemoveHolding={handleRemoveHolding}
                 onSelectTicker={setSelectedTicker}
                 selectedTicker={selectedTicker}
+                uid={uid}
               />
             )}
           </aside>

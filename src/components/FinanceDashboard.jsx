@@ -156,7 +156,7 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
 
   return (
     <div className="finance-tab-content">
-      {/* Master Cash Balance Card - Tiền Đang Có */}
+      {/* Master Cash Balance Card - Tiền Nhàn Rỗi */}
       <div 
         className="finance-card" 
         style={{ 
@@ -181,7 +181,7 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
-              Tổng Tiền Đang Có (Khả Dụng)
+              Tổng Tiền Nhàn Rỗi
             </div>
             {isEditingCash ? (
               <form onSubmit={handleSaveCash} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
@@ -206,7 +206,7 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
                     setCashInput(cashOnHand.toString());
                     setIsEditingCash(true);
                   }}
-                  title="Chỉnh sửa số tiền mặt đang có"
+                  title="Chỉnh sửa số tiền nhàn rỗi"
                   style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.4rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', width: '28px', height: '28px' }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
@@ -379,7 +379,7 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
 }
 
 // ==================== TAB 2: DEBTS ====================
-function DebtsTab({ debts, setDebts, uid }) {
+function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand = 0, onUpdateCashOnHand, uid }) {
   const DEFAULT_FORM = { 
     name: '', principalAmount: '', totalPayable: '', 
     principalPaid: '0', totalPaid: '0', interestRate: '0', 
@@ -396,6 +396,7 @@ function DebtsTab({ debts, setDebts, uid }) {
   const [actionId, setActionId] = useState(null);
   const [actionType, setActionType] = useState('pay'); // 'pay' or 'borrow'
   const [payPrincipal, setPayPrincipal] = useState('');
+  const [payInterest, setPayInterest] = useState('');
   const [payTotal, setPayTotal] = useState('');
   const [showScheduleId, setShowScheduleId] = useState(null);
 
@@ -476,21 +477,48 @@ function DebtsTab({ debts, setDebts, uid }) {
 
   const handlePayment = (id) => {
     const pPrincipal = parseFloat(payPrincipal) || 0;
-    const pTotal = parseFloat(payTotal) || 0;
-    if (pPrincipal <= 0 && pTotal <= 0) return;
+    const pInterest = parseFloat(payInterest) || 0;
+    const pTotal = pPrincipal + pInterest;
+    if (pPrincipal <= 0 && pInterest <= 0) return;
 
-    const updated = debts.map(d => {
-      if (d.id !== id) return d;
+    if (cashOnHand < pTotal) {
+      alert(`Số dư Tiền Nhàn Rỗi không đủ để thực hiện thanh toán này.\n(Số dư hiện tại: ${formatVND(cashOnHand)}, Cần thanh toán: ${formatVND(pTotal)})`);
+      return;
+    }
+
+    const d = debts.find(x => x.id === id);
+    if (!d) return;
+
+    const updated = debts.map(x => {
+      if (x.id !== id) return x;
       return { 
-        ...d, 
-        principalPaid: Math.min(d.principalPaid + pPrincipal, d.principalAmount),
-        totalPaid: Math.min(d.totalPaid + pTotal, d.totalPayable)
+        ...x, 
+        principalPaid: Math.min(x.principalPaid + pPrincipal, x.principalAmount),
+        totalPaid: Math.min(x.totalPaid + pTotal, x.totalPayable)
       };
     });
     setDebts(updated);
     saveDebts(uid, updated);
+
+    // Trừ ví Tiền Nhàn Rỗi
+    onUpdateCashOnHand(cashOnHand - pTotal);
+
+    // Tự sinh giao dịch Chi tiêu
+    const newTransaction = {
+      id: genId(),
+      type: 'expense',
+      amount: pTotal,
+      category: 'Khác',
+      note: `Trả nợ khoản vay: ${d.name} (Gốc: ${formatVND(pPrincipal)} + Lãi: ${formatVND(pInterest)})`,
+      date: new Date().toISOString().split('T')[0]
+    };
+    const updatedTransactions = [...transactions, newTransaction];
+    setTransactions(updatedTransactions);
+    saveTransactions(uid, updatedTransactions);
+
     setActionId(null);
     setPayPrincipal('');
+    setPayInterest('');
     setPayTotal('');
   };
 
@@ -498,22 +526,44 @@ function DebtsTab({ debts, setDebts, uid }) {
     const amount = parseFloat(payPrincipal) || 0;
     if (amount <= 0) return;
 
-    const updated = debts.map(d => {
-      if (d.id !== id) return d;
-      const additions = d.additions || [];
-      // Giả định vay thêm vào thời điểm hiện tại (tính tháng tương đối)
-      const start = new Date(d.startDate);
+    const d = debts.find(x => x.id === id);
+    if (!d) return;
+
+    const updated = debts.map(x => {
+      if (x.id !== id) return x;
+      const additions = x.additions || [];
+      const start = new Date(x.startDate);
       const now = new Date();
       const monthDiff = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+      const newPrincipal = x.principalAmount + amount;
+      const newTotalPayable = parseFloat(autoCalcTotal(newPrincipal, x.interestRate, x.durationMonths, x.principalFreq)) || (x.totalPayable + amount);
       
       return { 
-        ...d, 
-        principalAmount: d.principalAmount + amount,
-        additions: [...additions, { amount, month: Math.max(1, monthDiff), date: now.toISOString().slice(0, 10) }]
+        ...x, 
+        principalAmount: newPrincipal,
+        totalPayable: newTotalPayable,
+        additions: [...additions, { month: Math.max(1, monthDiff), amount }]
       };
     });
     setDebts(updated);
     saveDebts(uid, updated);
+
+    // Cộng vào ví Tiền Nhàn Rỗi
+    onUpdateCashOnHand(cashOnHand + amount);
+
+    // Tự sinh giao dịch Thu nhập
+    const newTransaction = {
+      id: genId(),
+      type: 'income',
+      amount: amount,
+      category: 'Khác',
+      note: `Vay thêm từ khoản: ${d.name}`,
+      date: new Date().toISOString().split('T')[0]
+    };
+    const updatedTransactions = [...transactions, newTransaction];
+    setTransactions(updatedTransactions);
+    saveTransactions(uid, updatedTransactions);
+
     setActionId(null);
     setPayPrincipal('');
   };
@@ -707,17 +757,35 @@ function DebtsTab({ debts, setDebts, uid }) {
                 )}
 
                 {actionId === d.id && (
-                  <div className="debt-action-form">
-                    <input 
-                      type="number" 
-                      className="input-field" 
-                      placeholder={actionType === 'pay' ? "Số tiền trả gốc (VNĐ)" : "Số tiền vay thêm (VNĐ)"}
-                      value={payPrincipal} 
-                      onChange={e => setPayPrincipal(e.target.value)} 
-                    />
-                    <div className="finance-form-actions">
-                      <button className="btn-submit" onClick={() => actionType === 'pay' ? handlePayment(d.id) : handleBorrow(d.id)}>Xác nhận</button>
-                      <button className="btn-cancel" onClick={() => setActionId(null)}>Hủy</button>
+                  <div className="debt-action-form" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="number" 
+                        className="input-field" 
+                        placeholder={actionType === 'pay' ? "Số tiền trả gốc (VNĐ)" : "Số tiền vay thêm (VNĐ)"}
+                        value={payPrincipal} 
+                        onChange={e => setPayPrincipal(e.target.value)} 
+                        style={{ flex: 1 }}
+                      />
+                      {actionType === 'pay' && (
+                        <input 
+                          type="number" 
+                          className="input-field" 
+                          placeholder="Số tiền trả lãi (VNĐ)"
+                          value={payInterest} 
+                          onChange={e => setPayInterest(e.target.value)} 
+                          style={{ flex: 1 }}
+                        />
+                      )}
+                    </div>
+                    {actionType === 'pay' && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--accent-green)', fontWeight: '600', paddingLeft: '0.25rem' }}>
+                        Tổng tiền thanh toán: {formatVND((parseFloat(payPrincipal) || 0) + (parseFloat(payInterest) || 0))}
+                      </div>
+                    )}
+                    <div className="finance-form-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                      <button className="btn-submit" onClick={() => actionType === 'pay' ? handlePayment(d.id) : handleBorrow(d.id)} style={{ flex: 1 }}>Xác nhận</button>
+                      <button className="btn-cancel" onClick={() => { setActionId(null); setPayPrincipal(''); setPayInterest(''); }} style={{ flex: 1 }}>Hủy</button>
                     </div>
                   </div>
                 )}
@@ -1396,6 +1464,22 @@ export default function FinanceDashboard({ uid }) {
   const [savings, setSavings] = useState([]);
   const [passbooks, setPassbooks] = useState([]);
 
+  // States for Master Balance edit at parent
+  const [isEditingCash, setIsEditingCash] = useState(false);
+  const [cashInput, setCashInput] = useState('');
+
+  const handleSaveCash = (e) => {
+    e.preventDefault();
+    const amount = Number(cashInput);
+    if (isNaN(amount) || amount < 0) {
+      alert('Vui lòng nhập số tiền hợp lệ.');
+      return;
+    }
+    setCashOnHand(amount);
+    saveCashOnHand(uid, amount);
+    setIsEditingCash(false);
+  };
+
   useEffect(() => {
     if (!uid) return;
     const unsub1 = subscribeTransactions(uid, setTransactions);
@@ -1407,9 +1491,76 @@ export default function FinanceDashboard({ uid }) {
   }, [uid]);
 
   return (
-    <div className="finance-dashboard">
+    <div className="finance-dashboard" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', overflowY: 'auto', boxSizing: 'border-box', width: '100%' }}>
+      {/* Master Cash Balance Card - Tiền Nhàn Rỗi */}
+      <div 
+        className="finance-card" 
+        style={{ 
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(99, 102, 241, 0.06) 100%)', 
+          border: '1px solid rgba(139, 92, 246, 0.25)', 
+          borderRadius: '1rem', 
+          padding: '1.25rem 1.5rem', 
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          boxShadow: '0 8px 32px 0 rgba(139, 92, 246, 0.05)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{ background: 'rgba(139, 92, 246, 0.12)', padding: '0.75rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a78bfa' }}>
+            <Wallet size={28} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+              Tổng Tiền Nhàn Rỗi
+            </div>
+            {isEditingCash ? (
+              <form onSubmit={handleSaveCash} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <input
+                  type="number"
+                  value={cashInput}
+                  onChange={(e) => setCashInput(e.target.value)}
+                  className="input-field"
+                  placeholder="Nhập số tiền..."
+                  style={{ padding: '0.4rem 0.75rem', fontSize: '1.1rem', width: '200px', boxSizing: 'border-box', height: '36px', borderRadius: '6px' }}
+                  autoFocus
+                  min="0"
+                />
+                <button type="submit" className="btn-submit" style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', borderRadius: '6px', height: '36px', cursor: 'pointer' }}>Lưu</button>
+                <button type="button" onClick={() => setIsEditingCash(false)} style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', height: '36px', cursor: 'pointer' }}>Hủy</button>
+              </form>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{formatVND(cashOnHand)}</div>
+                <button
+                  onClick={() => {
+                    setCashInput(cashOnHand.toString());
+                    setIsEditingCash(true);
+                  }}
+                  title="Chỉnh sửa số tiền nhàn rỗi"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.4rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', width: '28px', height: '28px' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                >
+                  <Edit3 size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '320px', lineHeight: 1.4 }}>
+          💡 Đây là tổng ví tiền mặt nhàn rỗi của bạn, tự động cộng thêm khi thu nhập và trừ đi khi chi tiêu.
+        </div>
+      </div>
+
       {/* Sub-tabs */}
-      <div className="finance-tabs">
+      <div className="finance-tabs" style={{ width: '100%', boxSizing: 'border-box' }}>
         <button className={`finance-tab-btn ${activeTab === 'transactions' ? 'active' : ''}`} onClick={() => setActiveTab('transactions')}>
           <DollarSign size={16} /> Chi Tiêu & Thu Nhập
         </button>
@@ -1437,7 +1588,20 @@ export default function FinanceDashboard({ uid }) {
           uid={uid} 
         />
       )}
-      {activeTab === 'debts' && <DebtsTab debts={debts} setDebts={setDebts} uid={uid} />}
+      {activeTab === 'debts' && (
+        <DebtsTab 
+          debts={debts} 
+          setDebts={setDebts} 
+          transactions={transactions}
+          setTransactions={setTransactions}
+          cashOnHand={cashOnHand}
+          onUpdateCashOnHand={(amount) => {
+            setCashOnHand(amount);
+            saveCashOnHand(uid, amount);
+          }}
+          uid={uid} 
+        />
+      )}
       {activeTab === 'savings' && <SavingsTab savings={savings} setSavings={setSavings} uid={uid} />}
       {activeTab === 'passbooks' && (
         <PassbooksTab 

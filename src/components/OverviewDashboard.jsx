@@ -188,10 +188,10 @@ export default function OverviewDashboard({ stockData, uid }) {
           <div className="finance-card-value">{formatVND(totalSavings)}</div>
         </div>
 
-        {/* Tiền Đang Có */}
+        {/* Tiền Nhàn Rỗi */}
         <div className="finance-card income-card" style={{ borderLeftColor: '#8b5cf6' }}>
           <Wallet size={24} style={{ marginBottom: '0.5rem', color: '#8b5cf6' }} />
-          <div className="finance-card-label">Tiền Đang Có</div>
+          <div className="finance-card-label">Tiền Nhàn Rỗi</div>
           <div className="finance-card-value" style={{ color: '#fff' }}>{formatVND(cashOnHand)}</div>
         </div>
       </div>
@@ -264,7 +264,7 @@ export default function OverviewDashboard({ stockData, uid }) {
             <div className="asset-item" style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
               <div className="asset-info">
                 <span className="asset-color" style={{ background: '#8b5cf6' }}></span>
-                <span style={{ fontWeight: 600 }}>Tiển Đang Có</span>
+                <span style={{ fontWeight: 600 }}>Tiền Nhàn Rỗi</span>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontWeight: 800 }}>{formatVND(cashOnHand)}</div>

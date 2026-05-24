@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchDomesticGold, fetchWorldGold } from '../utils/goldApi';
 import CandlestickChart from './CandlestickChart';
 import { Loader2, TrendingUp, TrendingDown, Lightbulb, MapPin, Plus, Trash2, Edit3, Check, X, Briefcase } from 'lucide-react';
-import { saveGoldHoldings, subscribeGoldHoldings } from '../firebase';
+import { saveGoldHoldings, subscribeGoldHoldings, subscribeTransactions, saveTransactions } from '../firebase';
 
 function formatVND(num) {
   if (!num) return '0';
@@ -13,7 +13,7 @@ function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-export default function GoldDashboard({ uid }) {
+export default function GoldDashboard({ uid, cashOnHand = 0, onUpdateCashOnHand }) {
   const [domesticGold, setDomesticGold] = useState([]);
   const [worldGold, setWorldGold] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +21,7 @@ export default function GoldDashboard({ uid }) {
 
   // Gold holdings
   const [holdings, setHoldings] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [activeTab, setActiveTab] = useState('prices'); // 'prices' or 'holdings'
@@ -68,10 +69,40 @@ export default function GoldDashboard({ uid }) {
     return () => unsub();
   }, [uid]);
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    if (!uid) return;
+    const unsubTx = subscribeTransactions(uid, setTransactions);
+    return () => unsubTx();
+  }, [uid]);
+
+  const handleSubmit = (shouldDeduct = false) => {
     const weight = parseFloat(form.weight);
     const buyPrice = parseFloat(form.buyPrice);
     if (!weight || !buyPrice || !form.name) return;
+
+    const cost = weight * buyPrice;
+
+    if (shouldDeduct) {
+      if (cashOnHand < cost) {
+        alert(`Số dư Tiền Nhàn Rỗi không đủ để thực hiện mua vàng.\n(Tiền nhàn rỗi hiện tại: ${formatVND(cashOnHand)}, Chi phí mua: ${formatVND(cost)})`);
+        return;
+      }
+      // Trừ ví Tiền Nhàn Rỗi
+      onUpdateCashOnHand(cashOnHand - cost);
+
+      // Tự sinh giao dịch Chi tiêu
+      const newTransaction = {
+        id: genId(),
+        type: 'expense',
+        amount: cost,
+        category: 'Đầu tư',
+        note: `Mua vàng: ${form.name} (${weight} ${form.unit} @ ${formatVND(buyPrice)})`,
+        date: form.buyDate || new Date().toISOString().split('T')[0]
+      };
+      const updatedTransactions = [...transactions, newTransaction];
+      setTransactions(updatedTransactions);
+      saveTransactions(uid, updatedTransactions);
+    }
 
     const entry = { ...form, weight, buyPrice, id: editId || genId() };
     let updated;
@@ -260,9 +291,32 @@ export default function GoldDashboard({ uid }) {
                 </div>
                 <input type="number" className="input-field" placeholder="Giá mua (VNĐ / lượng)" value={form.buyPrice} onChange={e => setForm({ ...form, buyPrice: e.target.value })} />
                 <input type="date" className="input-field" value={form.buyDate} onChange={e => setForm({ ...form, buyDate: e.target.value })} />
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Thêm</button>
-                  <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', width: '100%', flexWrap: 'wrap' }}>
+                  <button 
+                    type="button" 
+                    className="btn-submit" 
+                    style={{ flex: 1, minWidth: '140px', background: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                    onClick={() => handleSubmit(true)}
+                  >
+                    Mua Vàng (Trừ Tiền Nhàn Rỗi)
+                  </button>
+                  <button 
+                    type="button" 
+                    style={{ flex: 1, minWidth: '140px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                    onClick={() => handleSubmit(false)}
+                  >
+                    Thêm danh mục (Không trừ tiền)
+                  </button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem', width: '100%' }}>
+                  <button 
+                    type="button" 
+                    className="btn-cancel" 
+                    style={{ width: '100%', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                    onClick={() => { setShowForm(false); setEditId(null); }}
+                  >
+                    <X size={14} /> Hủy bỏ
+                  </button>
                 </div>
               </div>
             )}
@@ -327,7 +381,7 @@ export default function GoldDashboard({ uid }) {
                         <input type="number" className="input-field" placeholder="Giá mua (VNĐ / lượng)" value={form.buyPrice} onChange={e => setForm({ ...form, buyPrice: e.target.value })} />
                         <input type="date" className="input-field" value={form.buyDate} onChange={e => setForm({ ...form, buyDate: e.target.value })} />
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button className="btn-submit" onClick={handleSubmit}><Check size={14} /> Cập nhật</button>
+                          <button className="btn-submit" onClick={() => handleSubmit(false)}><Check size={14} /> Cập nhật</button>
                           <button className="btn-cancel" onClick={() => { setShowForm(false); setEditId(null); }}><X size={14} /> Hủy</button>
                         </div>
                       </div>
