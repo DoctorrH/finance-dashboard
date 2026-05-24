@@ -122,6 +122,40 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
   const totalExpense = manualFiltered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const balance = totalIncome - totalExpense;
 
+  const incomeByCategory = {};
+  const expenseByCategory = {};
+  manualFiltered.forEach(t => {
+    if (t.type === 'income') {
+      incomeByCategory[t.category] = (incomeByCategory[t.category] || 0) + t.amount;
+    } else {
+      expenseByCategory[t.category] = (expenseByCategory[t.category] || 0) + t.amount;
+    }
+  });
+
+  const getPieSegments = (dataMap, total) => {
+    if (total === 0) return [];
+    let currentOffset = 0;
+    const segments = [];
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+    let i = 0;
+    for (const [cat, amt] of Object.entries(dataMap).sort((a, b) => b[1] - a[1])) {
+      const p = amt / total;
+      segments.push({
+        cat,
+        amt,
+        p,
+        color: colors[i % colors.length],
+        offset: currentOffset
+      });
+      currentOffset += p;
+      i++;
+    }
+    return segments;
+  };
+
+  const incomeSegments = getPieSegments(incomeByCategory, totalIncome);
+  const expenseSegments = getPieSegments(expenseByCategory, totalExpense);
+
   const handleSubmit = () => {
     const amount = parseFloat(form.amount);
     if (!amount || amount <= 0) return;
@@ -169,66 +203,89 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
 
   return (
     <div className="finance-tab-content">
-      {/* Monthly Income/Expense Donut Chart */}
-      <div 
-        className="finance-card" 
-        style={{ 
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(239, 68, 68, 0.05) 100%)', 
-          border: '1px solid rgba(255, 255, 255, 0.05)', 
-          borderRadius: '1rem', 
-          padding: '1.25rem', 
-          marginBottom: '1.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '3rem',
-          flexWrap: 'wrap'
-        }}
-      >
-        <div style={{ position: 'relative', width: '140px', height: '140px' }}>
-          <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-            {(() => {
-              const total = totalIncome + totalExpense || 1;
-              const pExpense = (totalExpense / total) * 100;
-              const r = 40;
-              const circ = 2 * Math.PI * r;
-              return (
-                <>
-                  <circle cx="50" cy="50" r={r} fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="12" />
-                  {(totalIncome > 0 || totalExpense > 0) && (
-                    <>
-                      <circle cx="50" cy="50" r={r} fill="transparent" stroke="#10b981" strokeWidth="12" strokeDasharray={`${circ} ${circ}`} strokeDashoffset="0" />
-                      <circle cx="50" cy="50" r={r} fill="transparent" stroke="#ef4444" strokeWidth="12" strokeDasharray={`${(pExpense / 100) * circ} ${circ}`} strokeDashoffset="0" />
-                    </>
-                  )}
-                  <circle cx="50" cy="50" r="32" fill="var(--card-bg)" />
-                </>
-              );
-            })()}
-          </svg>
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', width: '100%' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '0.1rem' }}>Tháng {filterMonth + 1}</div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: balance >= 0 ? '#10b981' : '#ef4444' }}>
-              {balance > 0 ? '+' : ''}{formatVND(balance)}
+      {/* Monthly Breakdown Donut Charts */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+        
+        {/* Income Breakdown */}
+        <div className="finance-card" style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)', padding: '1.25rem' }}>
+          <div style={{ fontWeight: 600, color: '#10b981', marginBottom: '1.25rem', textAlign: 'center', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Thu nhập theo nguồn</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+              <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+                {(() => {
+                  const r = 40;
+                  const circ = 2 * Math.PI * r;
+                  if (totalIncome === 0) {
+                    return <circle cx="50" cy="50" r={r} fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="12" />;
+                  }
+                  return incomeSegments.map((s, i) => (
+                    <circle key={i} cx="50" cy="50" r={r} fill="transparent" stroke={s.color} strokeWidth="12" strokeDasharray={`${s.p * circ} ${circ}`} strokeDashoffset={`${-s.offset * circ}`} />
+                  ));
+                })()}
+                <circle cx="50" cy="50" r="32" fill="var(--card-bg)" />
+              </svg>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', width: '100%' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Tổng thu</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981' }}>{formatVND(totalIncome)}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', flex: 1, minWidth: '150px' }}>
+              {incomeSegments.length === 0 ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Chưa có thu nhập</div>
+              ) : incomeSegments.slice(0, 4).map((s, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: s.color }}></span>
+                    <span style={{ color: 'var(--text-secondary)', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.cat}>{s.cat}</span>
+                  </div>
+                  <div style={{ fontWeight: 600 }}>{(s.p * 100).toFixed(1)}%</div>
+                </div>
+              ))}
+              {incomeSegments.length > 4 && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '0.25rem' }}>+ {incomeSegments.length - 4} nguồn khác</div>}
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: '220px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981' }}></span>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Thu nhập</span>
+
+        {/* Expense Breakdown */}
+        <div className="finance-card" style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', padding: '1.25rem' }}>
+          <div style={{ fontWeight: 600, color: '#ef4444', marginBottom: '1.25rem', textAlign: 'center', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Chi tiêu theo mục</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+              <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+                {(() => {
+                  const r = 40;
+                  const circ = 2 * Math.PI * r;
+                  if (totalExpense === 0) {
+                    return <circle cx="50" cy="50" r={r} fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="12" />;
+                  }
+                  return expenseSegments.map((s, i) => (
+                    <circle key={i} cx="50" cy="50" r={r} fill="transparent" stroke={s.color} strokeWidth="12" strokeDasharray={`${s.p * circ} ${circ}`} strokeDashoffset={`${-s.offset * circ}`} />
+                  ));
+                })()}
+                <circle cx="50" cy="50" r="32" fill="var(--card-bg)" />
+              </svg>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', width: '100%' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Tổng chi</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444' }}>{formatVND(totalExpense)}</div>
+              </div>
             </div>
-            <div style={{ fontWeight: 700, color: '#10b981' }}>{formatVND(totalIncome)}</div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }}></span>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Chi tiêu</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', flex: 1, minWidth: '150px' }}>
+              {expenseSegments.length === 0 ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Chưa có chi tiêu</div>
+              ) : expenseSegments.slice(0, 4).map((s, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: s.color }}></span>
+                    <span style={{ color: 'var(--text-secondary)', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.cat}>{s.cat}</span>
+                  </div>
+                  <div style={{ fontWeight: 600 }}>{(s.p * 100).toFixed(1)}%</div>
+                </div>
+              ))}
+              {expenseSegments.length > 4 && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '0.25rem' }}>+ {expenseSegments.length - 4} mục khác</div>}
             </div>
-            <div style={{ fontWeight: 700, color: '#ef4444' }}>{formatVND(totalExpense)}</div>
           </div>
         </div>
+
       </div>
 
       {/* Monthly Summary Flow Row (3 cards) */}
