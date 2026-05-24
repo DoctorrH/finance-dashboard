@@ -873,11 +873,13 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
 }
 
 // ==================== TAB 3: SAVINGS ====================
-function SavingsTab({ savings, setSavings, uid }) {
+function SavingsTab({ savings, setSavings, transactions, setTransactions, cashOnHand = 0, onUpdateCashOnHand, uid }) {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [depositId, setDepositId] = useState(null);
   const [depositAmount, setDepositAmount] = useState('');
+  const [withdrawId, setWithdrawId] = useState(null);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
   const DEFAULT_FORM = { name: '', targetAmount: '', currentAmount: '0' };
   const [form, setForm] = useState(DEFAULT_FORM);
 
@@ -907,11 +909,99 @@ function SavingsTab({ savings, setSavings, uid }) {
     const amount = parseFloat(depositAmount);
     if (!amount || amount <= 0) return;
 
-    const updated = savings.map(g => g.id === id ? { ...g, currentAmount: g.currentAmount + amount } : g);
+    if (cashOnHand < amount) {
+      alert(`Số dư Tiền Nhàn Rỗi không đủ để nạp tiền tiết kiệm.\n(Hiện tại: ${formatVND(cashOnHand)}, Cần: ${formatVND(amount)})`);
+      return;
+    }
+
+    const g = savings.find(x => x.id === id);
+    if (!g) return;
+
+    const updated = savings.map(x => x.id === id ? { ...x, currentAmount: x.currentAmount + amount } : x);
     setSavings(updated);
     saveSavings(uid, updated);
+
+    // Trừ ví Tiền Nhàn Rỗi
+    onUpdateCashOnHand(cashOnHand - amount);
+
+    // Tự sinh giao dịch Chi tiêu
+    const newTransaction = {
+      id: genId(),
+      type: 'expense',
+      amount: amount,
+      category: 'Tiết kiệm',
+      note: `Nạp tiền vào mục tiêu tiết kiệm: ${g.name}`,
+      date: new Date().toISOString().split('T')[0]
+    };
+    const updatedTransactions = [...transactions, newTransaction];
+    setTransactions(updatedTransactions);
+    saveTransactions(uid, updatedTransactions);
+
     setDepositId(null);
     setDepositAmount('');
+  };
+
+  const handleWithdraw = (id) => {
+    const amount = parseFloat(withdrawAmount);
+    if (!amount || amount <= 0) return;
+
+    const g = savings.find(x => x.id === id);
+    if (!g) return;
+
+    if (amount > g.currentAmount) {
+      alert(`Số tiền rút không được vượt quá số tiền hiện có trong mục tiêu.\n(Hiện có: ${formatVND(g.currentAmount)})`);
+      return;
+    }
+
+    const updated = savings.map(x => x.id === id ? { ...x, currentAmount: x.currentAmount - amount } : x);
+    setSavings(updated);
+    saveSavings(uid, updated);
+
+    // Cộng vào ví Tiền Nhàn Rỗi
+    onUpdateCashOnHand(cashOnHand + amount);
+
+    // Tự sinh giao dịch Thu nhập
+    const newTransaction = {
+      id: genId(),
+      type: 'income',
+      amount: amount,
+      category: 'Tiết kiệm',
+      note: `Rút tiền từ mục tiêu tiết kiệm: ${g.name}`,
+      date: new Date().toISOString().split('T')[0]
+    };
+    const updatedTransactions = [...transactions, newTransaction];
+    setTransactions(updatedTransactions);
+    saveTransactions(uid, updatedTransactions);
+
+    setWithdrawId(null);
+    setWithdrawAmount('');
+  };
+
+  const handleCancelGoal = (id) => {
+    const g = savings.find(x => x.id === id);
+    if (!g) return;
+
+    if (window.confirm(`Bạn có chắc muốn hủy mục tiêu "${g.name}"?\nToàn bộ số tiền tiết kiệm (${formatVND(g.currentAmount)}) sẽ được hoàn về Tiền Nhàn Rỗi.`)) {
+      if (g.currentAmount > 0) {
+        onUpdateCashOnHand(cashOnHand + g.currentAmount);
+        
+        const newTransaction = {
+          id: genId(),
+          type: 'income',
+          amount: g.currentAmount,
+          category: 'Tiết kiệm',
+          note: `Hủy mục tiêu tiết kiệm: ${g.name} (Hoàn tiền)`,
+          date: new Date().toISOString().split('T')[0]
+        };
+        const updatedTransactions = [...transactions, newTransaction];
+        setTransactions(updatedTransactions);
+        saveTransactions(uid, updatedTransactions);
+      }
+
+      const updated = savings.filter(x => x.id !== id);
+      setSavings(updated);
+      saveSavings(uid, updated);
+    }
   };
 
   const handleDelete = (id) => {
@@ -1013,21 +1103,36 @@ function SavingsTab({ savings, setSavings, uid }) {
                   <div><span className="savings-label">Còn thiếu:</span> {formatVND(Math.max(g.targetAmount - g.currentAmount, 0))}</div>
                 </div>
 
-                {!isCompleted && (
-                  <>
-                    <button className="savings-deposit-btn" onClick={() => { setDepositId(g.id); setDepositAmount(''); }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                  {!isCompleted && (
+                    <button className="savings-deposit-btn" onClick={() => { setDepositId(g.id); setDepositAmount(''); setWithdrawId(null); }} style={{ flex: 1, padding: '0.4rem 0.5rem', fontSize: '0.75rem' }}>
                       <Plus size={14} /> Nạp thêm
                     </button>
-                    {depositId === g.id && (
-                      <div className="debt-action-form">
-                        <input type="number" className="input-field" placeholder="Số tiền nạp" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
-                        <button className="btn-submit small" onClick={() => handleDeposit(g.id)}><Check size={14} /></button>
-                        <button className="btn-cancel small" onClick={() => setDepositId(null)}><X size={14} /></button>
-                      </div>
-                    )}
-                  </>
+                  )}
+                  {g.currentAmount > 0 && (
+                    <button className="btn-cancel" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.4rem 0.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', flex: 1, cursor: 'pointer' }} onClick={() => { setWithdrawId(g.id); setWithdrawAmount(''); setDepositId(null); }}>
+                      <TrendingDown size={14} /> Rút bớt
+                    </button>
+                  )}
+                  <button className="btn-delete" style={{ padding: '0.4rem 0.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', flex: 1 }} onClick={() => handleCancelGoal(g.id)}>
+                    <X size={14} /> Hủy mục tiêu
+                  </button>
+                </div>
+                {depositId === g.id && (
+                  <div className="debt-action-form" style={{ marginTop: '0.5rem' }}>
+                    <input type="number" className="input-field" placeholder="Số tiền nạp (từ Tiền Nhàn Rỗi)" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
+                    <button className="btn-submit small" onClick={() => handleDeposit(g.id)}><Check size={14} /></button>
+                    <button className="btn-cancel small" onClick={() => setDepositId(null)}><X size={14} /></button>
+                  </div>
                 )}
-                {isCompleted && <div className="savings-completed-badge">🎉 Hoàn thành!</div>}
+                {withdrawId === g.id && (
+                  <div className="debt-action-form" style={{ marginTop: '0.5rem' }}>
+                    <input type="number" className="input-field" placeholder="Số tiền rút (về Tiền Nhàn Rỗi)" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} />
+                    <button className="btn-submit small" onClick={() => handleWithdraw(g.id)}><Check size={14} /></button>
+                    <button className="btn-cancel small" onClick={() => setWithdrawId(null)}><X size={14} /></button>
+                  </div>
+                )}
+                {isCompleted && <div className="savings-completed-badge" style={{ marginTop: '0.5rem' }}>🎉 Hoàn thành!</div>}
               </div>
 
               {/* Inline Edit Form */}
@@ -1598,7 +1703,20 @@ export default function FinanceDashboard({ uid }) {
           uid={uid} 
         />
       )}
-      {activeTab === 'savings' && <SavingsTab savings={savings} setSavings={setSavings} uid={uid} />}
+      {activeTab === 'savings' && (
+        <SavingsTab 
+          savings={savings} 
+          setSavings={setSavings} 
+          transactions={transactions}
+          setTransactions={setTransactions}
+          cashOnHand={cashOnHand}
+          onUpdateCashOnHand={(amount) => {
+            setCashOnHand(amount);
+            saveCashOnHand(uid, amount);
+          }}
+          uid={uid} 
+        />
+      )}
       {activeTab === 'passbooks' && (
         <PassbooksTab 
           passbooks={passbooks} 
