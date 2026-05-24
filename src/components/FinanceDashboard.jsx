@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Plus, Trash2, Edit3, ArrowUpCircle, ArrowDownCircle, 
   Target, CreditCard, PiggyBank, Calendar,
-  TrendingUp, DollarSign, X, Check, BookOpen, Wallet
+  TrendingUp, TrendingDown, DollarSign, X, Check, BookOpen, Wallet
 } from 'lucide-react';
 import { 
   saveTransactions, subscribeTransactions,
