@@ -465,6 +465,9 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
   const [payInterest, setPayInterest] = useState('');
   const [payTotal, setPayTotal] = useState('');
   const [showScheduleId, setShowScheduleId] = useState(null);
+  const [showHistoryId, setShowHistoryId] = useState(null);
+  const [editHistoryId, setEditHistoryId] = useState(null);
+  const [historyForm, setHistoryForm] = useState({ date: '', principal: '', interest: '' });
 
   const calculateMonths = (start, due) => {
     if (!start || !due) return '';
@@ -555,12 +558,25 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
     const d = debts.find(x => x.id === id);
     if (!d) return;
 
+    const newTransactionId = genId();
+    const newHistoryEntry = {
+      id: genId(),
+      type: 'repayment',
+      date: new Date().toISOString().split('T')[0],
+      principal: pPrincipal,
+      interest: pInterest,
+      total: pTotal,
+      transactionId: newTransactionId
+    };
+
     const updated = debts.map(x => {
       if (x.id !== id) return x;
+      const history = x.history || [];
       return { 
         ...x, 
         principalPaid: Math.min(x.principalPaid + pPrincipal, x.principalAmount),
-        totalPaid: Math.min(x.totalPaid + pTotal, x.totalPayable)
+        totalPaid: Math.min(x.totalPaid + pTotal, x.totalPayable),
+        history: [...history, newHistoryEntry]
       };
     });
     setDebts(updated);
@@ -571,12 +587,13 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
 
     // Tự sinh giao dịch Chi tiêu
     const newTransaction = {
-      id: genId(),
+      id: newTransactionId,
       type: 'expense',
       amount: pTotal,
-      category: 'Khác',
+      category: 'Trả nợ',
       note: `Trả nợ khoản vay: ${d.name} (Gốc: ${formatVND(pPrincipal)} + Lãi: ${formatVND(pInterest)})`,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      isSystem: true
     };
     const updatedTransactions = [...transactions, newTransaction];
     setTransactions(updatedTransactions);
@@ -595,6 +612,15 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
     const d = debts.find(x => x.id === id);
     if (!d) return;
 
+    const newHistoryEntry = {
+      id: genId(),
+      type: 'borrow',
+      date: new Date().toISOString().split('T')[0],
+      principal: amount,
+      interest: 0,
+      total: amount
+    };
+
     const updated = debts.map(x => {
       if (x.id !== id) return x;
       const additions = x.additions || [];
@@ -608,27 +634,12 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
         ...x, 
         principalAmount: newPrincipal,
         totalPayable: newTotalPayable,
-        additions: [...additions, { month: Math.max(1, monthDiff), amount }]
+        additions: [...additions, { month: Math.max(1, monthDiff), amount }],
+        history: [...(x.history || []), newHistoryEntry]
       };
     });
     setDebts(updated);
     saveDebts(uid, updated);
-
-    // Cộng vào ví Tiền Nhàn Rỗi
-    onUpdateCashOnHand(cashOnHand + amount);
-
-    // Tự sinh giao dịch Thu nhập
-    const newTransaction = {
-      id: genId(),
-      type: 'income',
-      amount: amount,
-      category: 'Khác',
-      note: `Vay thêm từ khoản: ${d.name}`,
-      date: new Date().toISOString().split('T')[0]
-    };
-    const updatedTransactions = [...transactions, newTransaction];
-    setTransactions(updatedTransactions);
-    saveTransactions(uid, updatedTransactions);
 
     setActionId(null);
     setPayPrincipal('');
@@ -656,6 +667,98 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
     });
     setEditId(d.id);
     setShowForm(true);
+  };
+
+  const handleDeleteHistory = (debtId, historyId) => {
+    const debt = debts.find(d => d.id === debtId);
+    if (!debt) return;
+    const entry = (debt.history || []).find(h => h.id === historyId);
+    if (!entry) return;
+
+    if (entry.type === 'repayment') {
+      onUpdateCashOnHand(cashOnHand + entry.total);
+      if (entry.transactionId) {
+        const newTrans = transactions.filter(t => t.id !== entry.transactionId);
+        setTransactions(newTrans);
+        saveTransactions(uid, newTrans);
+      }
+    }
+
+    const newHistory = (debt.history || []).filter(h => h.id !== historyId);
+    const updated = debts.map(d => {
+      if (d.id !== debtId) return d;
+      if (entry.type === 'repayment') {
+        const newPrincipalPaid = Math.max(0, d.principalPaid - entry.principal);
+        const newTotalPaid = Math.max(0, d.totalPaid - entry.total);
+        return { ...d, history: newHistory, principalPaid: newPrincipalPaid, totalPaid: newTotalPaid };
+      } else {
+        const newPrincipal = Math.max(0, d.principalAmount - entry.principal);
+        const newTotalPayable = parseFloat(autoCalcTotal(newPrincipal, d.interestRate, d.durationMonths, d.principalFreq)) || (d.totalPayable - entry.principal);
+        const additions = [...(d.additions || [])];
+        const idx = additions.findIndex(a => a.amount === entry.principal);
+        if (idx >= 0) additions.splice(idx, 1);
+        return { ...d, history: newHistory, principalAmount: newPrincipal, totalPayable: newTotalPayable, additions };
+      }
+    });
+    setDebts(updated);
+    saveDebts(uid, updated);
+  };
+
+  const submitEditHistory = (debtId) => {
+    const debt = debts.find(d => d.id === debtId);
+    if (!debt) return;
+    const entry = (debt.history || []).find(h => h.id === editHistoryId);
+    if (!entry) return;
+
+    const newPrincipal = parseFloat(historyForm.principal) || 0;
+    const newInterest = parseFloat(historyForm.interest) || 0;
+    const newTotal = newPrincipal + newInterest;
+    
+    if (entry.type === 'repayment') {
+      const diffTotal = newTotal - entry.total;
+      if (cashOnHand - diffTotal < 0) {
+         alert('Không đủ số dư Tiền Nhàn Rỗi để bù trừ!');
+         return;
+      }
+      onUpdateCashOnHand(cashOnHand - diffTotal);
+
+      if (entry.transactionId) {
+        const newTrans = transactions.map(t => {
+           if (t.id !== entry.transactionId) return t;
+           return { ...t, amount: newTotal, date: historyForm.date, note: `Trả nợ khoản vay: ${debt.name} (Gốc: ${formatVND(newPrincipal)} + Lãi: ${formatVND(newInterest)})` };
+        });
+        setTransactions(newTrans);
+        saveTransactions(uid, newTrans);
+      }
+    }
+
+    const updated = debts.map(d => {
+      if (d.id !== debtId) return d;
+      
+      const newHistory = (d.history || []).map(h => {
+        if (h.id !== editHistoryId) return h;
+        return { ...h, date: historyForm.date, principal: newPrincipal, interest: newInterest, total: newTotal };
+      });
+
+      if (entry.type === 'repayment') {
+        const diffP = newPrincipal - entry.principal;
+        const diffT = newTotal - entry.total;
+        return { ...d, history: newHistory, principalPaid: Math.max(0, d.principalPaid + diffP), totalPaid: Math.max(0, d.totalPaid + diffT) };
+      } else {
+        const diffP = newPrincipal - entry.principal;
+        const nPrincipal = d.principalAmount + diffP;
+        const nTotalPayable = parseFloat(autoCalcTotal(nPrincipal, d.interestRate, d.durationMonths, d.principalFreq)) || (d.totalPayable + diffP);
+        
+        const additions = [...(d.additions || [])];
+        const idx = additions.findIndex(a => a.amount === entry.principal);
+        if (idx >= 0) additions[idx] = { ...additions[idx], amount: newPrincipal };
+
+        return { ...d, history: newHistory, principalAmount: nPrincipal, totalPayable: nTotalPayable, additions };
+      }
+    });
+    setDebts(updated);
+    saveDebts(uid, updated);
+    setEditHistoryId(null);
   };
 
   return (
@@ -819,6 +922,7 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
                     <button className="debt-action-btn" onClick={() => { setActionId(d.id); setActionType('pay'); }}>💰 Trả nợ</button>
                     <button className="debt-action-btn" onClick={() => { setActionId(d.id); setActionType('borrow'); }}>➕ Vay thêm</button>
                     <button className="debt-action-btn" onClick={() => setShowScheduleId(showScheduleId === d.id ? null : d.id)}>📅 Lịch trả</button>
+                    <button className="debt-action-btn" onClick={() => setShowHistoryId(showHistoryId === d.id ? null : d.id)}>🕒 Lịch sử</button>
                   </div>
                 )}
 
@@ -890,6 +994,55 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                )}
+
+                {showHistoryId === d.id && (
+                  <div className="repayment-schedule-box" style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.5rem' }}>Lịch sử giao dịch</div>
+                    {!(d.history && d.history.length > 0) ? (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Chưa có giao dịch nào.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {[...d.history].sort((a, b) => new Date(b.date) - new Date(a.date)).map(h => (
+                          <div key={h.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '0.25rem', fontSize: '0.75rem' }}>
+                            {editHistoryId === h.id ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <input type="date" className="input-field" value={historyForm.date} onChange={e => setHistoryForm({...historyForm, date: e.target.value})} />
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                  <input type="number" className="input-field" placeholder={h.type === 'repayment' ? "Gốc trả" : "Tiền vay"} value={historyForm.principal} onChange={e => setHistoryForm({...historyForm, principal: e.target.value})} style={{ flex: 1 }} />
+                                  {h.type === 'repayment' && (
+                                    <input type="number" className="input-field" placeholder="Lãi trả" value={historyForm.interest} onChange={e => setHistoryForm({...historyForm, interest: e.target.value})} style={{ flex: 1 }} />
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                  <button className="btn-submit" style={{ flex: 1, padding: '0.25rem' }} onClick={() => submitEditHistory(d.id)}>Lưu</button>
+                                  <button className="btn-cancel" style={{ flex: 1, padding: '0.25rem' }} onClick={() => setEditHistoryId(null)}>Hủy</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <div style={{ fontWeight: 600, color: h.type === 'repayment' ? '#10b981' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    {h.type === 'repayment' ? <Check size={12} /> : <Plus size={12} />}
+                                    {h.type === 'repayment' ? 'Trả nợ' : 'Vay thêm'}
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginLeft: '0.5rem', fontWeight: 400 }}>{h.date}</span>
+                                  </div>
+                                  <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.5rem', color: 'var(--text-secondary)' }}>
+                                    <span>Gốc: {formatVND(h.principal)}</span>
+                                    {h.type === 'repayment' && <span>Lãi: {formatVND(h.interest)}</span>}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                  <button className="icon-btn" onClick={() => { setEditHistoryId(h.id); setHistoryForm({ date: h.date, principal: h.principal, interest: h.interest || 0 }); }}><Edit3 size={14} /></button>
+                                  <button className="icon-btn" style={{ color: '#ef4444' }} onClick={() => { if(window.confirm('Bạn có chắc muốn xóa giao dịch này?')) handleDeleteHistory(d.id, h.id); }}><Trash2 size={14} /></button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
