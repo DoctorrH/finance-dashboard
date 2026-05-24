@@ -95,10 +95,10 @@ export default function OverviewDashboard({ stockData, uid }) {
 
   // --- 4. Chi Tiêu Tháng Này ---
   const isSystemTransaction = (t) => {
-    if (t.isSystem) return true;
-    const systemCategories = ['Tiết kiệm', 'Đầu tư', 'Trả nợ', 'Giải ngân'];
+    if (t.isSystem && t.category !== 'Trả nợ') return true;
+    const systemCategories = ['Tiết kiệm', 'Đầu tư', 'Giải ngân'];
     if (systemCategories.includes(t.category) && t.note) {
-      const prefixes = ['Nạp tiền', 'Rút tiền', 'Hủy mục tiêu', 'Trả nợ', 'Vay thêm', 'Tất toán', 'Mở sổ', 'Mua vàng', 'Bán vàng', 'Mua cổ phiếu', 'Bán cổ phiếu'];
+      const prefixes = ['Nạp tiền', 'Rút tiền', 'Hủy mục tiêu', 'Vay thêm', 'Tất toán', 'Mở sổ', 'Mua vàng', 'Bán vàng', 'Mua cổ phiếu', 'Bán cổ phiếu'];
       if (prefixes.some(prefix => t.note.startsWith(prefix))) {
         return true;
       }
