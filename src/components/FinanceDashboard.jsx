@@ -612,13 +612,15 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
     const d = debts.find(x => x.id === id);
     if (!d) return;
 
+    const newTransactionId = genId();
     const newHistoryEntry = {
       id: genId(),
       type: 'borrow',
       date: new Date().toISOString().split('T')[0],
       principal: amount,
       interest: 0,
-      total: amount
+      total: amount,
+      transactionId: newTransactionId
     };
 
     const updated = debts.map(x => {
@@ -640,6 +642,21 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
     });
     setDebts(updated);
     saveDebts(uid, updated);
+
+    onUpdateCashOnHand(cashOnHand + amount);
+
+    const newTransaction = {
+      id: newTransactionId,
+      type: 'income',
+      amount: amount,
+      category: 'Giải ngân',
+      note: `Vay thêm từ khoản: ${d.name}`,
+      date: new Date().toISOString().split('T')[0],
+      isSystem: true
+    };
+    const updatedTransactions = [...transactions, newTransaction];
+    setTransactions(updatedTransactions);
+    saveTransactions(uid, updatedTransactions);
 
     setActionId(null);
     setPayPrincipal('');
@@ -677,6 +694,17 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
 
     if (entry.type === 'repayment') {
       onUpdateCashOnHand(cashOnHand + entry.total);
+      if (entry.transactionId) {
+        const newTrans = transactions.filter(t => t.id !== entry.transactionId);
+        setTransactions(newTrans);
+        saveTransactions(uid, newTrans);
+      }
+    } else if (entry.type === 'borrow') {
+      if (cashOnHand < entry.total) {
+        alert('Số dư Tiền Nhàn Rỗi không đủ để thu hồi khoản vay thêm này!');
+        return;
+      }
+      onUpdateCashOnHand(cashOnHand - entry.total);
       if (entry.transactionId) {
         const newTrans = transactions.filter(t => t.id !== entry.transactionId);
         setTransactions(newTrans);
@@ -726,6 +754,22 @@ function DebtsTab({ debts, setDebts, transactions, setTransactions, cashOnHand =
         const newTrans = transactions.map(t => {
            if (t.id !== entry.transactionId) return t;
            return { ...t, amount: newTotal, date: historyForm.date, note: `Trả nợ khoản vay: ${debt.name} (Gốc: ${formatVND(newPrincipal)} + Lãi: ${formatVND(newInterest)})` };
+        });
+        setTransactions(newTrans);
+        saveTransactions(uid, newTrans);
+      }
+    } else if (entry.type === 'borrow') {
+      const diffTotal = newTotal - entry.total;
+      if (cashOnHand + diffTotal < 0) {
+         alert('Không đủ số dư Tiền Nhàn Rỗi để bù trừ!');
+         return;
+      }
+      onUpdateCashOnHand(cashOnHand + diffTotal);
+
+      if (entry.transactionId) {
+        const newTrans = transactions.map(t => {
+           if (t.id !== entry.transactionId) return t;
+           return { ...t, amount: newTotal, date: historyForm.date, note: `Vay thêm từ khoản: ${debt.name}` };
         });
         setTransactions(newTrans);
         saveTransactions(uid, newTrans);
