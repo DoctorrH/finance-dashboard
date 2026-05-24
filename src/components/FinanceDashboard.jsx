@@ -1173,6 +1173,7 @@ function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, 
   };
 
   const [form, setForm] = useState(DEFAULT_FORM);
+  const [useCashOnHand, setUseCashOnHand] = useState(false);
 
   const TERMS = ['Không kỳ hạn', '1 tháng', '3 tháng', '6 tháng', '9 tháng', '12 tháng', '18 tháng', '24 tháng', '36 tháng'];
   const MATURITY_METHODS = ['Tự động quay vòng gốc và lãi', 'Tự động quay vòng gốc', 'Tất toán khi đáo hạn'];
@@ -1232,6 +1233,13 @@ function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, 
     const interestRate = parseFloat(form.interestRate);
     if (!form.bankName || isNaN(depositAmount) || isNaN(interestRate)) return;
 
+    if (!editId && useCashOnHand) {
+      if (cashOnHand < depositAmount) {
+        alert(`Số dư Tiền Nhàn Rỗi không đủ để mở sổ tiết kiệm.\n(Hiện tại: ${formatVND(cashOnHand)}, Cần: ${formatVND(depositAmount)})`);
+        return;
+      }
+    }
+
     const entry = {
       ...form,
       depositAmount,
@@ -1244,14 +1252,31 @@ function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, 
       updated = passbooks.map(p => p.id === editId ? entry : p);
     } else {
       updated = [...passbooks, entry];
+      if (useCashOnHand) {
+        if (onUpdateCashOnHand) onUpdateCashOnHand(cashOnHand - depositAmount);
+
+        const newTransaction = {
+          id: genId(),
+          type: 'expense',
+          amount: depositAmount,
+          category: 'Đầu tư',
+          note: `Mở sổ tiết kiệm: ${form.bankName}`,
+          date: new Date().toISOString().split('T')[0]
+        };
+        const updatedTransactions = [...transactions, newTransaction];
+        setTransactions(updatedTransactions);
+        saveTransactions(uid, updatedTransactions);
+      }
     }
 
     setPassbooks(updated);
     savePassbooks(uid, updated);
     setShowForm(false);
     setEditId(null);
+    setUseCashOnHand(false);
     setForm(DEFAULT_FORM);
   };
+
 
   const handleEdit = (p) => {
     setForm({
@@ -1372,6 +1397,7 @@ function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, 
           <div style={{ fontWeight: 700, marginBottom: '0.25rem', fontSize: '0.95rem' }}>
             {editId ? "Cập nhật sổ tiết kiệm" : "Mở sổ tiết kiệm mới"}
           </div>
+
           <div className="finance-form-row">
             <div style={{ flex: 2 }}>
               <span className="form-label">Tên ngân hàng / Sổ</span>
@@ -1382,6 +1408,14 @@ function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, 
               <input type="number" className="input-field" placeholder="Số tiền gửi" value={form.depositAmount} onChange={e => setForm({ ...form, depositAmount: e.target.value })} />
             </div>
           </div>
+          {!editId && (
+            <div className="finance-form-row" style={{ marginTop: '-0.2rem', marginBottom: '0.8rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                <input type="checkbox" checked={useCashOnHand} onChange={e => setUseCashOnHand(e.target.checked)} />
+                Dùng Tiền Nhàn Rỗi (sẽ tự động trừ tiền mặt)
+              </label>
+            </div>
+          )}
 
           <div className="finance-form-row">
             <div style={{ flex: 1 }}>
