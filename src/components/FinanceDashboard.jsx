@@ -156,6 +156,68 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
 
   return (
     <div className="finance-tab-content">
+      {/* Monthly Income/Expense Donut Chart */}
+      <div 
+        className="finance-card" 
+        style={{ 
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(239, 68, 68, 0.05) 100%)', 
+          border: '1px solid rgba(255, 255, 255, 0.05)', 
+          borderRadius: '1rem', 
+          padding: '1.25rem', 
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '3rem',
+          flexWrap: 'wrap'
+        }}
+      >
+        <div style={{ position: 'relative', width: '140px', height: '140px' }}>
+          <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+            {(() => {
+              const total = totalIncome + totalExpense || 1;
+              const pExpense = (totalExpense / total) * 100;
+              const r = 40;
+              const circ = 2 * Math.PI * r;
+              return (
+                <>
+                  <circle cx="50" cy="50" r={r} fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="12" />
+                  {(totalIncome > 0 || totalExpense > 0) && (
+                    <>
+                      <circle cx="50" cy="50" r={r} fill="transparent" stroke="#10b981" strokeWidth="12" strokeDasharray={`${circ} ${circ}`} strokeDashoffset="0" />
+                      <circle cx="50" cy="50" r={r} fill="transparent" stroke="#ef4444" strokeWidth="12" strokeDasharray={`${(pExpense / 100) * circ} ${circ}`} strokeDashoffset="0" />
+                    </>
+                  )}
+                  <circle cx="50" cy="50" r="32" fill="var(--card-bg)" />
+                </>
+              );
+            })()}
+          </svg>
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', width: '100%' }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '0.1rem' }}>Tháng {filterMonth + 1}</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: balance >= 0 ? '#10b981' : '#ef4444' }}>
+              {balance > 0 ? '+' : ''}{formatVND(balance)}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: '220px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981' }}></span>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Thu nhập</span>
+            </div>
+            <div style={{ fontWeight: 700, color: '#10b981' }}>{formatVND(totalIncome)}</div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }}></span>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Chi tiêu</span>
+            </div>
+            <div style={{ fontWeight: 700, color: '#ef4444' }}>{formatVND(totalExpense)}</div>
+          </div>
+        </div>
+      </div>
+
       {/* Monthly Summary Flow Row (3 cards) */}
       <div className="finance-summary-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
         <div className="finance-card income-card">
