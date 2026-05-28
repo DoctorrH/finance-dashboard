@@ -162,6 +162,24 @@ function Dashboard({ user }) {
     savePortfolioToFirebase(uid, newPortfolio);
   };
 
+  const handleSellHolding = (symbol, sellVolume, sellPrice) => {
+    let soldValue = 0;
+    const newPortfolio = portfolio.map(p => {
+      if (p.symbol === symbol) {
+        soldValue = sellVolume * sellPrice * 1000;
+        return { ...p, volume: p.volume - sellVolume };
+      }
+      return p;
+    }).filter(p => p.volume > 0);
+
+    setPortfolio(newPortfolio);
+    savePortfolioToFirebase(uid, newPortfolio);
+
+    if (soldValue > 0) {
+      handleUpdatePurchasingPower(purchasingPower + soldValue);
+    }
+  };
+
   const [currentApp, setCurrentApp] = useState('overview'); // 'overview', 'stocks', 'gold', 'finance'
 
   const handleSignOut = async () => {
@@ -296,6 +314,7 @@ function Dashboard({ user }) {
                 stockData={stockData}
                 onAddHolding={handleAddHolding}
                 onRemoveHolding={handleRemoveHolding}
+                onSellHolding={handleSellHolding}
                 onSelectTicker={setSelectedTicker}
                 selectedTicker={selectedTicker}
                 uid={uid}

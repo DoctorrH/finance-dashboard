@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Pencil, Wallet } from 'lucide-react';
 import { subscribeTransactions, saveTransactions } from '../firebase';
 
-export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpdatePurchasingPower, cashOnHand = 0, onUpdateCashOnHand, stockData, onAddHolding, onRemoveHolding, onSelectTicker, selectedTicker, uid }) {
+export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpdatePurchasingPower, cashOnHand = 0, onUpdateCashOnHand, stockData, onAddHolding, onRemoveHolding, onSellHolding, onSelectTicker, selectedTicker, uid }) {
   const [isAdding, setIsAdding] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [symbol, setSymbol] = useState('');
   const [buyPrice, setBuyPrice] = useState('');
   const [volume, setVolume] = useState('');
+
+  const [isSelling, setIsSelling] = useState(false);
+  const [sellSymbol, setSellSymbol] = useState('');
+  const [sellVolume, setSellVolume] = useState('');
+  const [sellPrice, setSellPrice] = useState('');
 
   // Sức mua cash state
   const [isEditingCash, setIsEditingCash] = useState(false);
@@ -119,6 +124,40 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
     setVolume(item.volume);
     setIsEditMode(true);
     setIsAdding(true);
+    setIsSelling(false);
+  };
+
+  const handleSellClick = (e, item) => {
+    e.stopPropagation();
+    setSellSymbol(item.symbol);
+    setSellPrice(item.currentPrice);
+    setSellVolume(item.volume);
+    setIsSelling(true);
+    setIsEditMode(false);
+    setIsAdding(false);
+  };
+
+  const handleSellSubmit = (e, maxVolume) => {
+    e.preventDefault();
+    const v = Number(sellVolume);
+    const p = Number(sellPrice);
+    if (isNaN(v) || v <= 0 || isNaN(p) || p <= 0) {
+      alert("Vui lòng nhập khối lượng và giá hợp lệ!");
+      return;
+    }
+    if (v > maxVolume) {
+      alert("Khối lượng bán không được vượt quá số lượng đang nắm giữ!");
+      return;
+    }
+    
+    if (onSellHolding) {
+      onSellHolding(sellSymbol, v, p);
+    }
+    
+    setIsSelling(false);
+    setSellSymbol('');
+    setSellVolume('');
+    setSellPrice('');
   };
 
   const handleAddClick = () => {
@@ -127,6 +166,7 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
     } else {
       setIsAdding(true);
       setIsEditMode(false);
+      setIsSelling(false);
       setSymbol('');
       setBuyPrice('');
       setVolume('');
@@ -341,6 +381,14 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
               <div style={{display: 'flex', gap: '4px'}}>
                 <button 
                   className="btn-edit" 
+                  style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}
+                  onClick={(e) => handleSellClick(e, item)}
+                  title="Bán cổ phiếu"
+                >
+                  Bán
+                </button>
+                <button 
+                  className="btn-edit" 
                   onClick={(e) => handleEditClick(e, item)}
                 >
                   <Pencil size={16} />
@@ -349,13 +397,54 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
                   className="btn-delete" 
                   onClick={(e) => {
                     e.stopPropagation();
-                    onRemoveHolding(item.symbol);
+                    if(window.confirm(`Bạn muốn xóa hoàn toàn ${item.symbol} khỏi danh mục? (Không hoàn tiền vào sức mua)`)) {
+                      onRemoveHolding(item.symbol);
+                    }
                   }}
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             </div>
+
+            {/* Inline Sell Form */}
+            {isSelling && sellSymbol === item.symbol && (
+              <form className="add-holding-form inline-edit" onSubmit={(e) => handleSellSubmit(e, item.volume)} style={{ marginTop: '0.5rem', marginBottom: '1rem', background: 'rgba(239, 68, 68, 0.05)' }}>
+                <input 
+                  type="text" 
+                  value={sellSymbol} 
+                  disabled
+                  className="input-field"
+                  style={{ opacity: 0.6, gridColumn: 'span 1' }}
+                />
+                <input 
+                  type="number" 
+                  value={sellPrice}
+                  onChange={e => setSellPrice(e.target.value)}
+                  placeholder="Giá bán"
+                  min="0"
+                  step="0.01"
+                  required
+                  className="input-field"
+                  style={{ gridColumn: 'span 1' }}
+                />
+                <input 
+                  type="number" 
+                  value={sellVolume}
+                  onChange={e => setSellVolume(e.target.value)}
+                  placeholder="Khối lượng bán"
+                  min="1"
+                  max={item.volume}
+                  required
+                  className="input-field"
+                  style={{ gridColumn: 'span 1' }}
+                />
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', gridColumn: 'span 3' }}>
+                  <button type="submit" className="btn-submit" style={{ flex: 1, background: '#ef4444' }}>Chốt Bán</button>
+                  <button type="button" className="btn-cancel" onClick={() => setIsSelling(false)} style={{ flex: 1 }}>Hủy</button>
+                </div>
+              </form>
+            )}
 
             {/* Inline Edit Form */}
             {isEditMode && symbol === item.symbol && (
