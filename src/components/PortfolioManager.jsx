@@ -66,7 +66,7 @@ export default function PortfolioManager({ portfolio, purchasingPower = 0, onUpd
       id: genId(),
       type: 'expense',
       amount: amount,
-      category: 'Đầu tư',
+      category: 'Mua cổ phiếu',
       note: `Nạp tiền vào tài khoản chứng khoán (Bổ sung Sức mua)`,
       date: new Date().toISOString().split('T')[0]
     };

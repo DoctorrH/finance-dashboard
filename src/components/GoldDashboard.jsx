@@ -95,7 +95,7 @@ export default function GoldDashboard({ uid, cashOnHand = 0, onUpdateCashOnHand 
         id: genId(),
         type: 'expense',
         amount: cost,
-        category: 'Đầu tư',
+        category: 'Mua vàng',
         note: `Mua vàng: ${form.name} (${weight} ${form.unit} @ ${formatVND(buyPrice)})`,
         date: form.buyDate || new Date().toISOString().split('T')[0]
       };

@@ -13,7 +13,7 @@ import {
 } from '../firebase';
 
 const CATEGORIES_INCOME = ['Lương', 'Thưởng', 'Đầu tư', 'Freelance', 'Khác'];
-const CATEGORIES_EXPENSE = ['Ăn uống', 'Di chuyển', 'Mua sắm', 'Nhà ở', 'Giáo dục', 'Y tế', 'Giải trí', 'Tiết kiệm', 'Khác'];
+const CATEGORIES_EXPENSE = ['Ăn uống', 'Di chuyển', 'Mua sắm', 'Nhà ở', 'Giáo dục', 'Y tế', 'Giải trí', 'Tiết kiệm', 'Mua vàng', 'Trả nợ', 'Mua cổ phiếu', 'Khác'];
 const REPAYMENT_OPTIONS = ['Hàng tháng', '2 tháng/lần', '3 tháng/lần', '6 tháng/lần', 'Hàng năm', 'Linh hoạt'];
 
 function formatVND(num) {
@@ -107,7 +107,7 @@ function TransactionsTab({ transactions, setTransactions, cashOnHand = 0, onUpda
 
   const isSystemTransaction = (t) => {
     if (t.isSystem && t.category !== 'Trả nợ') return true;
-    const systemCategories = ['Tiết kiệm', 'Đầu tư', 'Giải ngân'];
+    const systemCategories = ['Tiết kiệm', 'Đầu tư', 'Giải ngân', 'Mua vàng', 'Mua cổ phiếu'];
     if (systemCategories.includes(t.category) && t.note) {
       const prefixes = ['Nạp tiền', 'Rút tiền', 'Hủy mục tiêu', 'Vay thêm', 'Tất toán', 'Mở sổ', 'Mua vàng', 'Bán vàng', 'Mua cổ phiếu', 'Bán cổ phiếu'];
       if (prefixes.some(prefix => t.note.startsWith(prefix))) {
@@ -1540,7 +1540,7 @@ function PassbooksTab({ passbooks, setPassbooks, transactions, setTransactions, 
           id: genId(),
           type: 'expense',
           amount: depositAmount,
-          category: 'Đầu tư',
+          category: 'Tiết kiệm',
           note: `Mở sổ tiết kiệm: ${form.bankName}`,
           date: new Date().toISOString().split('T')[0]
         };
