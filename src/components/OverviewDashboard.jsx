@@ -210,7 +210,7 @@ export default function OverviewDashboard({ stockData, uid }) {
       </div>
 
       {/* Row 2: Asset Distribution (Pie Chart) */}
-      <div className="finance-card" style={{ marginTop: '1.5rem' }}>
+      <div className="finance-card" style={{ marginTop: '1.5rem', flexDirection: 'column', alignItems: 'stretch' }}>
         <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Target size={18} color="#3b82f6" /> Phân Bổ Tài Sản
         </h3>
@@ -290,7 +290,7 @@ export default function OverviewDashboard({ stockData, uid }) {
 
       <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
         {/* Row 3 Left: Monthly Summary */}
-        <div className="finance-card" style={{ flex: 1, minWidth: 'min(100%, 300px)' }}>
+        <div className="finance-card" style={{ flex: 1, minWidth: 'min(100%, 300px)', flexDirection: 'column', alignItems: 'stretch' }}>
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Activity size={18} color="#f59e0b" /> Thu/Chi Tháng Này
           </h3>
@@ -310,7 +310,7 @@ export default function OverviewDashboard({ stockData, uid }) {
         </div>
 
         {/* Right Col: 6 Month Chart */}
-        <div className="finance-card" style={{ flex: 2, minWidth: 'min(100%, 400px)' }}>
+        <div className="finance-card" style={{ flex: 2, minWidth: 'min(100%, 400px)', flexDirection: 'column', alignItems: 'stretch' }}>
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <TrendingUp size={18} color="#10b981" /> Thu Chi 6 Tháng Gần Nhất
           </h3>
@@ -341,7 +341,7 @@ export default function OverviewDashboard({ stockData, uid }) {
       </div>
 
       {/* Asset Growth Chart (Bar Chart) */}
-      <div className="finance-card" style={{ marginTop: '1.5rem' }}>
+      <div className="finance-card" style={{ marginTop: '1.5rem', flexDirection: 'column', alignItems: 'stretch' }}>
         <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <TrendingUp size={18} color="#3b82f6" /> Tăng Trưởng Tài Sản (12 Tháng)
         </h3>
