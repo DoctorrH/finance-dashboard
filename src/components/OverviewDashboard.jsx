@@ -179,7 +179,7 @@ export default function OverviewDashboard({ stockData, uid }) {
     <div className="finance-dashboard" style={{ padding: '1rem', overflowY: 'auto' }}>
       
       {/* Row 1: Core Summary Cards (3 cards) */}
-      <div className="finance-summary-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+      <div className="finance-summary-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1rem' }}>
         {/* Total Assets */}
         <div className="finance-card balance-card">
           <Wallet size={24} style={{ marginBottom: '0.5rem', color: '#3b82f6' }} />
@@ -243,7 +243,7 @@ export default function OverviewDashboard({ stockData, uid }) {
             </div>
           </div>
 
-          <div className="asset-breakdown" style={{ flex: 1, maxWidth: '400px' }}>
+          <div className="asset-breakdown" style={{ flex: 1, minWidth: 'min(100%, 250px)', maxWidth: '400px' }}>
             <div className="asset-item" style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem' }}>
               <div className="asset-info">
                 <span className="asset-color" style={{ background: '#3b82f6' }}></span>
@@ -290,7 +290,7 @@ export default function OverviewDashboard({ stockData, uid }) {
 
       <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
         {/* Row 3 Left: Monthly Summary */}
-        <div className="finance-card" style={{ flex: 1, minWidth: '300px' }}>
+        <div className="finance-card" style={{ flex: 1, minWidth: 'min(100%, 300px)' }}>
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Activity size={18} color="#f59e0b" /> Thu/Chi Tháng Này
           </h3>
@@ -310,12 +310,12 @@ export default function OverviewDashboard({ stockData, uid }) {
         </div>
 
         {/* Right Col: 6 Month Chart */}
-        <div className="finance-card" style={{ flex: 2, minWidth: '400px' }}>
+        <div className="finance-card" style={{ flex: 2, minWidth: 'min(100%, 400px)', overflowX: 'auto' }}>
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <TrendingUp size={18} color="#10b981" /> Thu Chi 6 Tháng Gần Nhất
           </h3>
           
-          <div className="bar-chart-container" style={{ display: 'flex', alignItems: 'flex-end', height: '220px', gap: '1rem', paddingTop: '1rem', position: 'relative' }}>
+          <div className="bar-chart-container" style={{ display: 'flex', alignItems: 'flex-end', height: '220px', gap: '1rem', paddingTop: '1rem', position: 'relative', minWidth: 'max-content', paddingRight: '1rem' }}>
             {last6Months.map(m => {
               const incomeHeight = Math.max((m.income / maxChartValue) * 100, 2); // min 2%
               const expenseHeight = Math.max((m.expense / maxChartValue) * 100, 2); // min 2%
@@ -351,8 +351,8 @@ export default function OverviewDashboard({ stockData, uid }) {
             Hệ thống đang thu thập dữ liệu (cần ít nhất 2 tháng để vẽ biểu đồ)
           </div>
         ) : (
-          <div style={{ padding: '1rem 0' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', height: '200px', gap: '0.5rem', position: 'relative', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ padding: '1rem 0', overflowX: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', height: '200px', gap: '0.5rem', position: 'relative', borderBottom: '1px solid rgba(255,255,255,0.1)', minWidth: 'max-content', paddingRight: '1rem' }}>
               {(() => {
                 const maxVal = Math.max(...assetChartData.map(h => h.value), 1);
                 // Lấy 12 bản ghi gần nhất
