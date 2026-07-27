@@ -297,12 +297,12 @@ export default function OverviewDashboard({ stockData, uid }) {
           <div className="finance-card-value" style={{ color: netMonthly >= 0 ? '#10b981' : '#ef4444', fontSize: '1.5rem', marginBottom: '1rem' }}>
             {netMonthly >= 0 ? '+' : ''}{formatVND(netMonthly)}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ flex: 1, minWidth: '120px', padding: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>THU NHẬP</div>
               <div style={{ fontWeight: 700, color: '#10b981' }}>{formatVND(currentIncome)}</div>
             </div>
-            <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
+            <div style={{ flex: 1, minWidth: '120px', padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>CHI TIÊU</div>
               <div style={{ fontWeight: 700, color: '#ef4444' }}>{formatVND(currentExpense)}</div>
             </div>
@@ -310,21 +310,21 @@ export default function OverviewDashboard({ stockData, uid }) {
         </div>
 
         {/* Right Col: 6 Month Chart */}
-        <div className="finance-card" style={{ flex: 2, minWidth: 'min(100%, 400px)', overflowX: 'auto' }}>
+        <div className="finance-card" style={{ flex: 2, minWidth: 'min(100%, 400px)' }}>
           <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <TrendingUp size={18} color="#10b981" /> Thu Chi 6 Tháng Gần Nhất
           </h3>
           
-          <div className="bar-chart-container" style={{ display: 'flex', alignItems: 'flex-end', height: '220px', gap: '1rem', paddingTop: '1rem', position: 'relative', minWidth: 'max-content', paddingRight: '1rem' }}>
+          <div className="bar-chart-container" style={{ display: 'flex', alignItems: 'flex-end', height: '220px', gap: '4px', paddingTop: '1rem', position: 'relative' }}>
             {last6Months.map(m => {
               const incomeHeight = Math.max((m.income / maxChartValue) * 100, 2); // min 2%
               const expenseHeight = Math.max((m.expense / maxChartValue) * 100, 2); // min 2%
               
               return (
-                <div key={m.label} className="chart-group" style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                  <div className="bars" style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: '4px', width: '100%', justifyContent: 'center' }}>
-                    <div className="bar income-bar" style={{ height: `${incomeHeight}%`, width: '18px', background: 'linear-gradient(to top, #059669, #10b981)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Thu: ${formatVND(m.income)}`}></div>
-                    <div className="bar expense-bar" style={{ height: `${expenseHeight}%`, width: '18px', background: 'linear-gradient(to top, #b91c1c, #ef4444)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Chi: ${formatVND(m.expense)}`}></div>
+                <div key={m.label} className="chart-group" style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
+                  <div className="bars" style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: '2px', width: '100%', justifyContent: 'center' }}>
+                    <div className="bar income-bar" style={{ height: `${incomeHeight}%`, width: '100%', maxWidth: '18px', background: 'linear-gradient(to top, #059669, #10b981)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Thu: ${formatVND(m.income)}`}></div>
+                    <div className="bar expense-bar" style={{ height: `${expenseHeight}%`, width: '100%', maxWidth: '18px', background: 'linear-gradient(to top, #b91c1c, #ef4444)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease' }} title={`Chi: ${formatVND(m.expense)}`}></div>
                   </div>
                   <div className="chart-label" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, marginTop: 'auto' }}>{m.label}</div>
                 </div>
@@ -351,8 +351,8 @@ export default function OverviewDashboard({ stockData, uid }) {
             Hệ thống đang thu thập dữ liệu (cần ít nhất 2 tháng để vẽ biểu đồ)
           </div>
         ) : (
-          <div style={{ padding: '1rem 0', overflowX: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', height: '200px', gap: '0.5rem', position: 'relative', borderBottom: '1px solid rgba(255,255,255,0.1)', minWidth: 'max-content', paddingRight: '1rem' }}>
+          <div style={{ padding: '1rem 0' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', height: '200px', gap: '2px', position: 'relative', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               {(() => {
                 const maxVal = Math.max(...assetChartData.map(h => h.value), 1);
                 // Lấy 12 bản ghi gần nhất
@@ -369,7 +369,7 @@ export default function OverviewDashboard({ stockData, uid }) {
                         <div 
                           style={{ 
                             height: `${height}%`, 
-                            width: '80%', 
+                            width: '90%', 
                             maxWidth: '40px',
                             background: 'linear-gradient(to top, #2563eb, #3b82f6)', 
                             borderRadius: '4px 4px 0 0',
