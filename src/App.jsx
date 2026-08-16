@@ -6,9 +6,10 @@ import PortfolioManager from './components/PortfolioManager';
 import GoldDashboard from './components/GoldDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import OverviewDashboard from './components/OverviewDashboard';
+import PhysicalAssetDashboard from './components/PhysicalAssetDashboard';
 import LoginPage from './components/LoginPage';
 import LogoIcon from './components/LogoIcon';
-import { Activity, TrendingUp, TrendingDown, Loader2, Briefcase, BarChart2, Wallet, PieChart, LogOut } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Loader2, Briefcase, BarChart2, Wallet, PieChart, LogOut, Home } from 'lucide-react';
 import { savePortfolioToFirebase, savePurchasingPowerToFirebase, subscribeToPortfolio, onAuthChange, signOutUser, migrateOldData, saveCashOnHand, subscribeCashOnHand } from './firebase';
 
 class ErrorBoundary extends React.Component {
@@ -244,6 +245,13 @@ function Dashboard({ user }) {
           >
             <TrendingUp size={16} /> <span>Vàng</span>
           </button>
+          <button 
+            className={`switch-btn ${currentApp === 'assets' ? 'active' : ''}`}
+            onClick={() => setCurrentApp('assets')}
+            style={currentApp === 'assets' ? { background: 'rgba(20,184,166,0.15)', color: '#14b8a6', borderColor: '#14b8a6' } : {}}
+          >
+            <Home size={16} /> <span>Tài Sản</span>
+          </button>
         </div>
 
           {/* User Info & Logout */}
@@ -279,6 +287,10 @@ function Dashboard({ user }) {
         <FinanceDashboard uid={uid} />
       ) : currentApp === 'gold' ? (
         <GoldDashboard uid={uid} cashOnHand={cashOnHand} onUpdateCashOnHand={handleUpdateCashOnHand} />
+      ) : currentApp === 'assets' ? (
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          <PhysicalAssetDashboard uid={uid} cashOnHand={cashOnHand} onUpdateCashOnHand={handleUpdateCashOnHand} />
+        </div>
       ) : (
         /* Stock Market Main Content */
         <main className="main-content">

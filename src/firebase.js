@@ -169,7 +169,7 @@ export const subscribeGoldHoldings = (uid, callback) => {
   });
 };
 
-// === Asset History (Lịch sử Tài sản) ===
+// === Asset History (Lịch sử Tổng Tài Sản) ===
 export const saveAssetHistory = async (uid, data) => {
   try {
     await setDoc(userDoc(uid, 'asset_history'), { history: data }, { merge: true });
@@ -182,6 +182,44 @@ export const subscribeAssetHistory = (uid, callback) => {
   return onSnapshot(userDoc(uid, 'asset_history'), (docSnap) => {
     if (docSnap.exists()) {
       callback(docSnap.data().history || []);
+    } else {
+      callback([]);
+    }
+  });
+};
+
+// === Net Worth History (Lịch sử Tài sản Ròng) ===
+export const saveNetWorthHistory = async (uid, data) => {
+  try {
+    await setDoc(userDoc(uid, 'networth_history'), { history: data }, { merge: true });
+  } catch (err) {
+    console.error("Error saving net worth history: ", err);
+  }
+};
+
+export const subscribeNetWorthHistory = (uid, callback) => {
+  return onSnapshot(userDoc(uid, 'networth_history'), (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data().history || []);
+    } else {
+      callback([]);
+    }
+  });
+};
+
+// === Physical Assets (Tài sản hiện hữu) ===
+export const savePhysicalAssets = async (uid, data) => {
+  try {
+    await setDoc(userDoc(uid, 'physical_assets'), { items: data }, { merge: true });
+  } catch (err) {
+    console.error("Error saving physical assets: ", err);
+  }
+};
+
+export const subscribePhysicalAssets = (uid, callback) => {
+  return onSnapshot(userDoc(uid, 'physical_assets'), (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data().items || []);
     } else {
       callback([]);
     }
