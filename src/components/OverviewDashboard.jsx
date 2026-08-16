@@ -128,7 +128,8 @@ export default function OverviewDashboard({ stockData, uid }) {
   const totalDebt = debts.reduce((sum, d) => sum + (d.principalAmount - d.principalPaid), 0);
 
   // Tài Sản Ròng = Tổng Tài Sản - Tổng Nợ
-  const netWorth = totalAssets - totalDebt;
+  // Tài Sản Ròng = Tiền mặt + Tiết kiệm + Chứng khoán + Vàng
+  const netWorth = cashOnHand + totalSavings + totalStockAccountValue + totalGoldValue;
 
   // --- Thu Chi ---
   const isSystemTransaction = (t) => {
@@ -236,7 +237,7 @@ export default function OverviewDashboard({ stockData, uid }) {
           <TrendingUp size={24} style={{ marginBottom: '0.5rem', color: netWorth >= 0 ? '#10b981' : '#ef4444' }} />
           <div className="finance-card-label">Tài Sản Ròng</div>
           <div className="finance-card-value" style={{ color: netWorth >= 0 ? '#10b981' : '#ef4444' }}>{formatVND(netWorth)}</div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>= Tổng TS − Tổng Nợ</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>= Tiền mặt + Tiết kiệm + Chứng khoán + Vàng</div>
         </div>
 
         {/* Tổng Nợ */}
